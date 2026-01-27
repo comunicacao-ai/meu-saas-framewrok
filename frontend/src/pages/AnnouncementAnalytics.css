@@ -1,0 +1,359 @@
+.analytics-page {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+  background: 
+    radial-gradient(ellipse at top right, rgba(34, 197, 94, 0.05) 0%, transparent 50%),
+    var(--bg-primary);
+}
+
+.analytics-loading,
+.analytics-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  height: 100%;
+}
+
+/* Header */
+.analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.analytics-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.analytics-header-left h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.analytics-header-left p {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+.analytics-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.analytics-date {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+/* Cards */
+.analytics-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.analytics-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.analytics-card-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+
+.analytics-card-icon.sent {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent-primary);
+}
+
+.analytics-card-icon.opens {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+}
+
+.analytics-card-icon.clicks {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--info);
+}
+
+.analytics-card-icon.ctor {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
+.analytics-card-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.analytics-card-value small {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.analytics-card-label {
+  font-size: 14px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  display: block;
+}
+
+.analytics-card-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--bg-tertiary);
+}
+
+.analytics-card-bar-fill {
+  height: 100%;
+  border-radius: 0 2px 0 0;
+  transition: width 1s ease;
+}
+
+.analytics-card-bar-fill.opens {
+  background: var(--success);
+}
+
+.analytics-card-bar-fill.clicks {
+  background: var(--info);
+}
+
+/* Grid */
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1024px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Section */
+.analytics-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.analytics-section.full-width {
+  grid-column: 1 / -1;
+}
+
+.analytics-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.analytics-section h2 svg {
+  color: var(--accent-primary);
+}
+
+.analytics-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+/* Links */
+.analytics-links {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.analytics-link {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.link-rank {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  min-width: 30px;
+}
+
+.link-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.link-url {
+  display: block;
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.link-clicks {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* Activity */
+.analytics-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--border-color);
+}
+
+.activity-item.open {
+  border-left-color: var(--success);
+}
+
+.activity-item.click {
+  border-left-color: var(--info);
+}
+
+.activity-item.bounce {
+  border-left-color: var(--error);
+}
+
+.activity-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.activity-item.open .activity-icon {
+  color: var(--success);
+}
+
+.activity-item.click .activity-icon {
+  color: var(--info);
+}
+
+.activity-item.bounce .activity-icon {
+  color: var(--error);
+}
+
+.activity-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-email {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-action {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.activity-time {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Delivery Stats */
+.delivery-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.delivery-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 32px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  min-width: 100px;
+}
+
+.delivery-stat-count {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.delivery-stat-label {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-transform: capitalize;
+  margin-top: 4px;
+}
+
+.delivery-stat.sent .delivery-stat-count {
+  color: var(--success);
+}
+
+.delivery-stat.pending .delivery-stat-count {
+  color: var(--text-secondary);
+}
+
+.delivery-stat.failed .delivery-stat-count {
+  color: var(--error);
+}
+

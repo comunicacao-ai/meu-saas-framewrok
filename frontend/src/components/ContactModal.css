@@ -1,0 +1,189 @@
+/* Fundo escuro atrás do modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.75);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    padding: 1rem;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  /* A caixa do modal */
+  .modal-content {
+    background-color: #202024;
+    width: 100%;
+    max-width: 800px;
+    border-radius: 8px;
+    border: 1px solid #323238;
+    padding: 2rem;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .modal-header h2 {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin: 0;
+  }
+  
+  .close-btn {
+    background: transparent;
+    border: none;
+    color: #7c7c8a;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+  .close-btn:hover {
+    background: #29292e;
+    color: #e1e1e6;
+  }
+  
+  /* Grid do Formulário */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  
+  /* Em telas pequenas, vira uma coluna só */
+  @media (max-width: 600px) {
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .full-width {
+    grid-column: 1 / -1;
+  }
+  
+  .form-group label {
+    font-size: 0.875rem;
+    color: #a8a8b3;
+  }
+  
+  .form-group input,
+  .form-group select {
+    background-color: #121214;
+    border: 1px solid #323238;
+    border-radius: 6px;
+    padding: 10px;
+    color: white;
+    outline: none;
+    font-size: 0.9rem;
+  }
+  
+  .form-group input:focus,
+  .form-group select:focus {
+    border-color: #8257e6;
+  }
+  
+  /* Área de Tags */
+  .tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #121214;
+    border-radius: 6px;
+    border: 1px solid #323238;
+    min-height: 40px;
+  }
+  
+  .tag-btn {
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .tag-btn:hover {
+    opacity: 0.8;
+  }
+  
+  .loading-text, .empty-text {
+    font-size: 0.8rem;
+    color: #7c7c8a;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .new-tag-input {
+    width: 100%;
+    font-size: 0.85rem;
+    padding: 8px;
+    background: transparent !important; /* Sobrescreve estilo padrão */
+    border: 1px dashed #323238 !important;
+  }
+  
+  .new-tag-input:focus {
+    border-color: #8257e6 !important;
+  }
+  
+  /* Rodapé com botões */
+  .modal-footer {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+  }
+  
+  .btn-cancel {
+    background: transparent;
+    border: 1px solid #323238;
+    color: #e1e1e6;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .btn-cancel:hover {
+    background: #29292e;
+  }
+  
+  .btn-save {
+    background: #00875f;
+    border: none;
+    color: white;
+    padding: 10px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .btn-save:hover {
+    background: #015f43;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }

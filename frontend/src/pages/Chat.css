@@ -1,0 +1,38 @@
+.chat-container {
+  display: flex;       /* IMPORTANTE: Coloca Sidebar e Main lado a lado */
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #121214; /* Cor de fundo escura */
+}
+
+.chat-main {
+  flex: 1;             /* Ocupa todo o espaço restante */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-loading {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #121214;
+  color: white;
+}
+
+/* Spinner simples se não tiver */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-radius: 50%;
+  border-top-color: #8257e6;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
