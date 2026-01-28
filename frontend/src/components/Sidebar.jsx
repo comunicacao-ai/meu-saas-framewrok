@@ -1,21 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Layout, MessageSquare, Users, Tag, LogOut, 
   ChevronLeft, ChevronRight, Hash, Plus, Settings
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../services/supabaseClient';
 
 export default function Sidebar({ channels = [], onCreateChannel }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [profile, setProfile] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  // Função para verificar se o item está ativo
+  useEffect(() => {
+    (async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+      const { data } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
+      if (data) setProfile(data);
+    })();
+  }, [user]);
+
   const isActive = (path) => location.pathname.startsWith(path);
 
-  // Função de Logout
   async function handleLogout() {
     await logout();
     window.location.href = '/login';
@@ -143,19 +152,22 @@ export default function Sidebar({ channels = [], onCreateChannel }) {
 
       {/* --- RODAPÉ (PERFIL) --- */}
       <div style={{ padding: '20px', borderTop: '1px solid #202024', display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#323238', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12 }}>
-             {user?.email?.[0].toUpperCase()}
+        <button
+          onClick={() => navigate('/profile')}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+        >
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#323238', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, overflow: 'hidden' }}>
+             {profile?.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : user?.user_metadata?.avatar_url ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : user?.email?.[0].toUpperCase()}
           </div>
           {!isCollapsed && (
-            <div style={{ overflow: 'hidden' }}>
+            <div style={{ overflow: 'hidden', textAlign: 'left' }}>
               <span style={{ display: 'block', fontSize: 13, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
-                {user?.user_metadata?.name || 'Usuário'}
+                {profile?.full_name || user?.user_metadata?.name || 'Usuário'}
               </span>
-              <span style={{ fontSize: 11, color: '#a8a8b3' }}>Online</span>
+              <span style={{ fontSize: 11, color: '#a8a8b3' }}>{profile?.role || 'Online'}</span>
             </div>
           )}
-        </div>
+        </button>
         
         {!isCollapsed && (
           <button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: '#a8a8b3', cursor: 'pointer' }} title="Sair">

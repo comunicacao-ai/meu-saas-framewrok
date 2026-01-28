@@ -8,7 +8,8 @@ import WelcomeView from '../components/WelcomeView';
 import Announcements from './Announcements';     // <--- LISTA (DASHBOARD)
 import AnnouncementEditor from './AnnouncementEditor'; // <--- EDITOR NOVO
 import Tags from './Tags';
-import Audience from './Audience'; 
+import Audience from './Audience';
+import Profile from './Profile';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabaseClient';
 import './Chat.css';
@@ -65,6 +66,7 @@ export default function Chat() {
           
           <Route path="/tags" element={<Tags />} />
           <Route path="/publico" element={<Audience />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </main>
     </div>

@@ -17,9 +17,17 @@ export default function Audience() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
 
+  const [availableTags, setAvailableTags] = useState([]);
+
   useEffect(() => {
     fetchContacts();
+    fetchTags();
   }, []);
+
+  async function fetchTags() {
+    const { data } = await supabase.from('tags').select('*').order('name');
+    if (data) setAvailableTags(data);
+  }
 
   async function fetchContacts() {
     try {
@@ -293,14 +301,18 @@ export default function Audience() {
                   <td style={{ padding: '15px' }}>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: '250px' }}>
                       {contact.tags && contact.tags.length > 0 ? (
-                        contact.tags.map((tag, i) => (
-                          <span key={i} style={{ 
-                            background: '#29292e', border: '1px solid #323238', 
-                            padding: '2px 8px', borderRadius: '12px', fontSize: '11px', color: '#c4c4cc' 
-                          }}>
-                            {tag}
-                          </span>
-                        ))
+                        contact.tags.map((tagName, i) => {
+                          const tagMeta = availableTags.find(t => t.name === tagName);
+                          const bg = tagMeta?.color || '#8257e6';
+                          return (
+                            <span key={i} style={{ 
+                              background: bg, border: '1px solid transparent', 
+                              padding: '2px 8px', borderRadius: '12px', fontSize: '11px', color: '#fff' 
+                            }}>
+                              {tagName}
+                            </span>
+                          );
+                        })
                       ) : <span style={{ color: '#555', fontSize: '12px' }}>-</span>}
                     </div>
                   </td>

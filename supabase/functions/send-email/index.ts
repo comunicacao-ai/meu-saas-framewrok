@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { type, to, subject, html, variables, audienceType, tags, campaignId } = await req.json();
+    const { type, to, subject, html, variables, audienceType, tags, campaignId, baseUrl } = await req.json();
 
     // 2. Retrieve Environment Variables
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -89,13 +89,18 @@ serve(async (req) => {
           const fullName = contact.name || 'Colaborador';
           const firstName = contact.name ? contact.name.split(' ')[0] : 'Colaborador';
           
+          const base = baseUrl || 'https://yourapp.com';
           personalizedHtml = personalizedHtml
-            .replace(/{{name}}/g, fullName)
-            .replace(/{{nome}}/g, fullName)
-            .replace(/{{primeiro_nome}}/g, firstName)
-            .replace(/{{email}}/g, contact.email || '')
-            .replace(/{{cargo}}/g, contact.role || '')
-            .replace(/{{empresa}}/g, 'Framework');
+            .replace(/\{\{base_url\}\}/g, base)
+            .replace(/\{\{campaign_id\}\}/g, String(campaignId))
+            .replace(/\{\{contact_id\}\}/g, String(contact.id))
+            .replace(/\{\{name\}\}/g, fullName)
+            .replace(/\{\{nome\}\}/g, fullName)
+            .replace(/\{\{primeiro_nome\}\}/g, firstName)
+            .replace(/\{\{email\}\}/g, contact.email || '')
+            .replace(/\{\{cargo\}\}/g, contact.role || '')
+            .replace(/\{\{empresa\}\}/g, 'Framework')
+            .replace(/\{\{company\}\}/g, 'Framework');
 
           // E. Send to Resend
           const res = await fetch("https://api.resend.com/emails", {

@@ -6,14 +6,25 @@ import {
   Eye, Mail, Loader2, CheckCircle, AlertTriangle, ChevronDown, 
   CheckSquare, Square, Bold, Italic, Smartphone, Monitor,
   AlignLeft, AlignCenter, AlignRight, Copy, Share2, Columns, Minus,
-  TrendingUp, List, Activity, Link as LinkIcon
+  TrendingUp, List, Activity, Link as LinkIcon, Smile
 } from 'lucide-react';
+
+const VARIABLES = [
+  { label: 'Nome', value: '{{name}}' },
+  { label: 'Empresa', value: '{{company}}' },
+  { label: 'E-mail', value: '{{email}}' },
+  { label: 'Cargo', value: '{{cargo}}' },
+  { label: 'Primeiro nome', value: '{{primeiro_nome}}' },
+];
 import './Audience.css';
 
 // ============================================================================
 // 1. HELPER: GERADOR DE HTML
 // ============================================================================
-const generateHTML = (blocks, subject, previewText, isFinalTemplate = true) => {
+const generateHTML = (blocks, subject, previewText, isFinalTemplate = true, npsContext = null) => {
+  const base = npsContext?.baseUrl ?? '{{base_url}}';
+  const cid = npsContext?.campaignId ?? '{{campaign_id}}';
+  const contactId = npsContext?.contactId ?? '{{contact_id}}';
   let bodyContent = '';
   blocks.forEach(block => {
     const s = block.style || {};
@@ -36,7 +47,7 @@ const generateHTML = (blocks, subject, previewText, isFinalTemplate = true) => {
       case 'text':
         let txt = c.text || ''; 
         if(!txt.includes('<')) txt = txt.replace(/\n/g, '<br/>');
-        blockHTML = `<tr><td align="${s.align}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><div style="font-family: sans-serif; font-size: ${s.fontSize}px; color: ${s.color}; line-height: 1.6;">${txt}</div></td></tr>`;
+        blockHTML = `<tr><td align="${s.align}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><div style="font-family: ${s.fontFamily || 'sans-serif'}; font-size: ${s.fontSize}px; color: ${s.color}; line-height: 1.6;">${txt}</div></td></tr>`;
         break;
 
       case 'image':
@@ -66,6 +77,19 @@ const generateHTML = (blocks, subject, previewText, isFinalTemplate = true) => {
 
       case 'imagetext':
         blockHTML = `<tr><td style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="40%" valign="middle" style="padding-right: 15px;"><img src="${c.url}" style="width: 100%; border-radius: 4px; display: block;" /></td><td width="60%" valign="middle" style="font-family: sans-serif; font-size: 14px; color: ${s.color}; line-height: 1.5;"><strong style="font-size: 16px;">${c.title}</strong><br/>${c.text}</td></tr></table></td></tr>`;
+        break;
+
+      case 'nps':
+        const npsPrompt = c.prompt || 'De 0 a 10, o quanto você recomenda nossa equipe?';
+        const useEmojis = c.useEmojis;
+        let npsBtns = '';
+        const emojis = ['😞','🙁','😐','🙂','😊','😄','🤩','😍','🔥','🌟','💯'];
+        for (let i = 0; i <= 10; i++) {
+          const href = `${base}/feedback/${cid}/${contactId}/${i}`;
+          const label = useEmojis ? emojis[i] : String(i);
+          npsBtns += `<a href="${href}" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;margin:2px;background:#8257e6;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;font-size:14px;">${label}</a>`;
+        }
+        blockHTML = `<tr><td align="${s.align || 'center'}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><p style="margin:0 0 12px 0;font-family:sans-serif;font-size:14px;color:#333;">${npsPrompt}</p><div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;">${npsBtns}</div></td></tr>`;
         break;
     }
     bodyContent += blockHTML;
@@ -110,30 +134,37 @@ function RichTextEditor({ value, onChange }) {
   const ref = useRef(null);
   
   const insert = (e, before, after = '') => {
-    e.preventDefault(); // Impede que o botão roube o foco do textarea
+    e.preventDefault();
     const input = ref.current;
     if (!input) return;
     const start = input.selectionStart;
     const end = input.selectionEnd;
     const txt = input.value;
     const newTxt = txt.substring(0, start) + before + txt.substring(start, end) + after + txt.substring(end);
-    
     onChange(newTxt);
-    
-    // Devolve o foco e ajusta o cursor
-    setTimeout(() => { 
-      input.focus(); 
-      input.setSelectionRange(start + before.length, end + before.length + (end - start)); 
-    }, 0);
+    setTimeout(() => { input.focus(); input.setSelectionRange(start + before.length, end + before.length + (end - start)); }, 0);
+  };
+
+  const insertVar = (e) => {
+    const v = e.target.value;
+    if (!v) return;
+    insert(e, v, '');
+    e.target.value = '';
   };
 
   return (
     <div style={{ border: '1px solid #323238', borderRadius: 6, overflow: 'hidden' }}>
-      <div style={{ background: '#202024', padding: 5, borderBottom: '1px solid #323238', display: 'flex', gap: 4 }}>
+      <div style={{ background: '#202024', padding: 5, borderBottom: '1px solid #323238', display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
         <ToolBtn icon={<Bold size={14}/>} onClick={(e) => insert(e, '<b>', '</b>')}/>
         <ToolBtn icon={<Italic size={14}/>} onClick={(e) => insert(e, '<i>', '</i>')}/>
-        <div style={{width:1, background:'#323238', margin:'0 4px'}}></div>
-        <ToolBtn text="{Nome}" onClick={(e) => insert(e, '{{name}}')}/>
+        <div style={{ width: 1, background: '#323238', margin: '0 4px', alignSelf: 'stretch' }} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#a8a8b3' }}>
+          Inserir variável:
+          <select onChange={insertVar} style={{ background: '#121214', border: '1px solid #323238', color: 'white', borderRadius: 4, padding: '4px 6px', fontSize: 11, cursor: 'pointer' }}>
+            <option value="">—</option>
+            {VARIABLES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
+          </select>
+        </label>
       </div>
       <textarea 
         ref={ref} 
@@ -183,19 +214,21 @@ function getDefaultContent(type) {
   if (type === 'button') return { text: 'Clique Aqui', url: 'https://' };
   if (type === 'social') return { instagram: 'https://instagram.com', linkedin: 'https://linkedin.com', website: 'https://seusite.com' };
   if (type === 'imagetext') return { title: 'Título em Destaque', text: 'Descrição curta sobre a imagem ao lado.', url: 'https://via.placeholder.com/150' };
-  if (type === 'header') return { url: '', imageUrl: '' }; // Adicionado url padrão
+  if (type === 'header') return { url: '', imageUrl: '' };
+  if (type === 'nps') return { prompt: 'De 0 a 10, o quanto você recomenda nossa equipe?', useEmojis: false };
   return { url: 'https://via.placeholder.com/600x200', link: '' };
 }
 
 function getDefaultStyle(type) {
   const base = { backgroundColor: 'transparent', padding: 20, align: 'center' };
-  if (type === 'text') return { ...base, color: '#333333', fontSize: 16, textAlign: 'left', align: 'left' };
+  if (type === 'text') return { ...base, color: '#333333', fontSize: 16, fontFamily: 'sans-serif', textAlign: 'left', align: 'left' };
   if (type === 'button') return { ...base, buttonColor: '#8257e6', textColor: '#ffffff', borderRadius: 6 };
-  if (type === 'spacer') return { ...base, height: 30, showLine: true, lineColor: '#F5F5F5', padding: 0 };
+  if (type === 'spacer') return { ...base, height: 30, showLine: true, lineColor: '#e1e1e6', backgroundColor: '#ffffff', padding: 0 };
   if (type === 'image') return { ...base, borderRadius: 4, width: '100%' };
   if (type === 'header') return { ...base, backgroundColor: '#ffffff', padding: 30 };
   if (type === 'imagetext') return { ...base, backgroundColor: '#ffffff', color: '#333333' };
   if (type === 'social') return { ...base, color: '#8257e6', padding: 15 };
+  if (type === 'nps') return { ...base, padding: 24 };
   return base;
 }
 
@@ -241,11 +274,25 @@ const ListView = ({ campaigns, onNew, onEdit, onViewDash }) => {
 const DashboardView = ({ campaign, onBack }) => {
   const [events, setEvents] = useState([]);
   const [tagRanking, setTagRanking] = useState([]);
+  const [npsResponses, setNpsResponses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (campaign) fetchEvents();
+    if (campaign) { fetchEvents(); fetchNps(); }
   }, [campaign]);
+
+  async function fetchNps() {
+    const { data: res } = await supabase
+      .from('campaign_responses')
+      .select('*')
+      .eq('campaign_id', campaign.id)
+      .order('created_at', { ascending: false });
+    if (!res || res.length === 0) { setNpsResponses([]); return; }
+    const contactIds = [...new Set(res.map(r => r.contact_id))];
+    const { data: contacts } = await supabase.from('contacts').select('id, name, email').in('id', contactIds);
+    const byId = (contacts || []).reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+    setNpsResponses(res.map(r => ({ ...r, contact: byId[r.contact_id] })));
+  }
 
   async function fetchEvents() {
     setIsLoading(true);
@@ -283,6 +330,7 @@ const DashboardView = ({ campaign, onBack }) => {
 
   const opens = events.filter(e => e.event_type === 'open' || e.event_type === 'delivered').slice(0, 10);
   const bounces = events.filter(e => e.event_type === 'bounce');
+  const npsAvg = npsResponses.length ? (npsResponses.reduce((a, r) => a + r.score, 0) / npsResponses.length).toFixed(1) : null;
 
   return (
     <div className="audience-container" style={{ height: '100%', overflowY: 'auto', padding: '30px' }}>
@@ -326,6 +374,32 @@ const DashboardView = ({ campaign, onBack }) => {
                  {bounces.length === 0 && <tr><td colSpan={2} style={{padding:20, textAlign:'center', color:'#7c7c8a'}}>Nenhum erro encontrado! 🎉</td></tr>}
                </tbody>
              </table>
+          </div>
+
+          <div style={{ background: '#202024', borderRadius: 8, border: '1px solid #8257e650', overflow:'hidden' }}>
+            <div style={{ padding: 15, borderBottom: '1px solid #323238', display:'flex', gap:10, alignItems:'center' }}><Smile size={18} color="#8257e6"/><span style={{fontWeight:'bold', color:'white'}}>Satisfação / NPS</span></div>
+            <div style={{ padding: 15 }}>
+              {npsAvg != null && (
+                <div style={{ marginBottom: 16, display:'flex', alignItems:'center', gap:12 }}>
+                  <span style={{ fontSize: 28, fontWeight: 'bold', color: '#8257e6' }}>{npsAvg}</span>
+                  <span style={{ color: '#a8a8b3', fontSize: 14 }}>média · {npsResponses.length} resposta{npsResponses.length !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ background: '#121214' }}><tr><th style={thStyle}>Contato</th><th style={thStyle}>NPS</th><th style={thStyle}>Comentário</th><th style={thStyle}>Data</th></tr></thead>
+                <tbody>
+                  {npsResponses.map(r => (
+                    <tr key={r.id} style={{ borderBottom: '1px solid #29292e' }}>
+                      <td style={tdStyle}>{r.contact?.name || r.contact?.email || '-'}</td>
+                      <td style={tdStyle}>{r.score}</td>
+                      <td style={{ ...tdStyle, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.comment || ''}>{r.comment || '-'}</td>
+                      <td style={tdStyle}>{new Date(r.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                  {npsResponses.length === 0 && <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: '#7c7c8a' }}>Nenhuma resposta NPS ainda.</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
         <div style={{ background: '#202024', borderRadius: 8, border: '1px solid #323238', height:'fit-content' }}>
@@ -388,7 +462,8 @@ export default function Announcements() {
     if (!email) return;
     setLoading(true);
     try {
-      const htmlBody = generateHTML(editorState.blocks, `[TESTE] ${editorState.subject}`, editorState.previewText, true);
+      const npsCtx = typeof window !== 'undefined' ? { baseUrl: window.location.origin, campaignId: editorState.id || 'preview', contactId: '11111111-1111-1111-1111-111111111111' } : null;
+      const htmlBody = generateHTML(editorState.blocks, `[TESTE] ${editorState.subject}`, editorState.previewText, true, npsCtx);
       const { error } = await supabase.functions.invoke('send-email', {
         body: { type: 'test', to: email, subject: `[TESTE] ${editorState.subject}`, html: htmlBody, variables: { name: 'Visitante Teste' } }
       });
@@ -438,7 +513,8 @@ export default function Announcements() {
         subject: editorState.subject,
         html: htmlBody,
         audienceType: editorState.audienceType ?? 'all',
-        tags: editorState.tags ?? []
+        tags: editorState.tags ?? [],
+        baseUrl: typeof window !== 'undefined' ? window.location.origin : ''
       };
       console.log('[handleSave] Enviando para send-email. Payload:', { ...invokePayload, html: '(html omitido)' });
       const { data: fnData, error } = await supabase.functions.invoke('send-email', { body: invokePayload });
@@ -497,11 +573,12 @@ export default function Announcements() {
   if (viewMode === 'dashboard') return <DashboardView campaign={selectedCampaign} onBack={() => setViewMode('list')} />;
 
   const currentBlock = editorState.blocks.find(b => b.id === selectedBlockId);
-  const htmlFinalPreview = generateHTML(editorState.blocks, editorState.subject, editorState.previewText, true);
+  const npsPreviewContext = typeof window !== 'undefined' ? { baseUrl: window.location.origin, campaignId: editorState.id || 'preview', contactId: '11111111-1111-1111-1111-111111111111' } : null;
+  const htmlFinalPreview = generateHTML(editorState.blocks, editorState.subject, editorState.previewText, true, npsPreviewContext);
 
   return (
-    <div className="audience-container" style={{ padding: 0, height: '100vh', display: 'flex', flexDirection: 'column', background: '#09090a' }}>
-      <div style={{ height: 60, borderBottom: '1px solid #29292e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', background: '#121214' }}>
+    <div className="audience-container" style={{ padding: 0, minHeight: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#09090a' }}>
+      <div style={{ height: 60, flexShrink: 0, borderBottom: '1px solid #29292e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', background: '#121214' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}><button onClick={() => setViewMode('list')} style={{ background: 'none', border: 'none', color: '#a8a8b3', cursor: 'pointer' }}><ArrowLeft size={20} /></button><div><span style={{ fontWeight: 'bold', color: 'white', fontSize: 14 }}>{editorState.id ? 'Editar Campanha' : 'Nova Campanha'}</span></div></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ background: '#202024', borderRadius: 6, padding: 4, display: 'flex', border: '1px solid #29292e' }}>
@@ -518,31 +595,31 @@ export default function Announcements() {
           <button onClick={() => setIsPreviewModalOpen(true)} className="btn-primary" style={{ padding: '8px 16px' }}><Eye size={16} style={{marginRight:6}}/> Revisar & Enviar</button>
         </div>
       </div>
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <div style={{ width: 320, background: '#121214', borderRight: '1px solid #29292e', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        <div style={{ width: 320, flexShrink: 0, background: '#121214', borderRight: '1px solid #29292e', display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div style={{ padding: 20, borderBottom: '1px solid #29292e' }}><p style={sectionTitleStyle}>CONFIGURAÇÕES</p><label style={labelStyle}>Assunto</label><input value={editorState.subject} onChange={e => setEditorState({...editorState, subject: e.target.value})} style={inputStyle} /><label style={{...labelStyle, marginTop: 15}}>Preheader</label><input value={editorState.previewText} onChange={e => setEditorState({...editorState, previewText: e.target.value})} style={inputStyle} /><div style={{ marginTop: 20 }}><label style={labelStyle}>Enviar Para:</label><div style={{ display: 'flex', gap: 10 }}><TabButton active={editorState.audienceType === 'all'} onClick={() => setEditorState({...editorState, audienceType: 'all'})} label="Todos" icon={<Users size={14}/>} /><TabButton active={editorState.audienceType === 'tags'} onClick={() => setEditorState({...editorState, audienceType: 'tags'})} label="Por Tags" icon={<Tag size={14}/>} /></div>{editorState.audienceType === 'tags' && (<div style={{ background: '#202024', padding: 10, borderRadius: 6, border: '1px solid #29292e', marginTop:10 }}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{availableTags.map(t => (<div key={t.id} onClick={() => toggleTag(t.name)} style={{ fontSize: 11, cursor: 'pointer', padding: '4px 8px', borderRadius: 4, background: editorState.tags.includes(t.name) ? '#8257e6' : '#29292e', color: 'white', border: '1px solid #323238' }}>{t.name}</div>))}</div></div>)}</div></div>
-            <div style={{ padding: 20 }}><p style={sectionTitleStyle}>ADICIONAR BLOCOS</p><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}><BlockCard icon={<Layout size={18} />} label="Topo" onClick={() => addBlock('header')} /><BlockCard icon={<Type size={18} />} label="Texto" onClick={() => addBlock('text')} /><BlockCard icon={<Columns size={18} />} label="Img + Texto" onClick={() => addBlock('imagetext')} /><BlockCard icon={<ImageIcon size={18} />} label="Imagem" onClick={() => addBlock('image')} /><BlockCard icon={<MousePointerClick size={18} />} label="Botão" onClick={() => addBlock('button')} /><BlockCard icon={<Share2 size={18} />} label="Social" onClick={() => addBlock('social')} /><BlockCard icon={<Minus size={18} />} label="Espaço" onClick={() => addBlock('spacer')} /></div></div>
+            <div style={{ padding: 20, borderBottom: '1px solid #29292e' }}><p style={sectionTitleStyle}>CONFIGURAÇÕES</p><label style={labelStyle}>Assunto</label><input value={editorState.subject} onChange={e => setEditorState({...editorState, subject: e.target.value})} style={inputStyle} /><label style={{...labelStyle, marginTop: 15}}>Preheader</label><input value={editorState.previewText} onChange={e => setEditorState({...editorState, previewText: e.target.value})} style={inputStyle} /><div style={{ marginTop: 20 }}><label style={labelStyle}>Enviar Para:</label><div style={{ display: 'flex', gap: 10 }}><TabButton active={editorState.audienceType === 'all'} onClick={() => setEditorState({...editorState, audienceType: 'all'})} label="Todos" icon={<Users size={14}/>} /><TabButton active={editorState.audienceType === 'tags'} onClick={() => setEditorState({...editorState, audienceType: 'tags'})} label="Por Tags" icon={<Tag size={14}/>} /></div>{editorState.audienceType === 'tags' && (<div style={{ background: '#202024', padding: 10, borderRadius: 6, border: '1px solid #29292e', marginTop:10 }}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{availableTags.map(t => (<div key={t.id} onClick={() => toggleTag(t.name)} style={{ fontSize: 11, cursor: 'pointer', padding: '4px 8px', borderRadius: 4, background: editorState.tags.includes(t.name) ? (t.color || '#8257e6') : '#29292e', color: 'white', border: `1px solid ${t.color || '#323238'}` }}>{t.name}</div>))}</div></div>)}</div></div>
+            <div style={{ padding: 20 }}><p style={sectionTitleStyle}>ADICIONAR BLOCOS</p><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}><BlockCard icon={<Layout size={18} />} label="Topo" onClick={() => addBlock('header')} /><BlockCard icon={<Type size={18} />} label="Texto" onClick={() => addBlock('text')} /><BlockCard icon={<Columns size={18} />} label="Img + Texto" onClick={() => addBlock('imagetext')} /><BlockCard icon={<ImageIcon size={18} />} label="Imagem" onClick={() => addBlock('image')} /><BlockCard icon={<MousePointerClick size={18} />} label="Botão" onClick={() => addBlock('button')} /><BlockCard icon={<Share2 size={18} />} label="Social" onClick={() => addBlock('social')} /><BlockCard icon={<Minus size={18} />} label="Espaço" onClick={() => addBlock('spacer')} /><BlockCard icon={<Smile size={18} />} label="Pesquisa/NPS" onClick={() => addBlock('nps')} /></div></div>
           </div>
         </div>
-        <div style={{ flex: 1, background: '#09090a', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', overflowY: 'auto' }}>
-          <div style={{ width: previewDevice === 'mobile' ? '375px' : '600px', transition: 'width 0.3s', background: 'white', minHeight: 'fit-content', height: 'fit-content', borderRadius: previewDevice === 'mobile' ? 30 : 4 }}>
-             <div style={{ padding: 0 }}>{editorState.blocks.map((block) => (<div key={block.id} onClick={() => setSelectedBlockId(block.id)} style={{ position: 'relative', outline: selectedBlockId === block.id ? '2px solid #8257e6' : '1px dashed transparent', cursor: 'pointer' }}><div dangerouslySetInnerHTML={{ __html: generateHTML([block], '', '', false) }} />{selectedBlockId === block.id && (<div className="block-actions" style={{ position: 'absolute', right: -40, top: 0, display: 'flex', flexDirection: 'column', gap: 5 }}><ActionBtn icon={<ChevronDown size={14} style={{transform:'rotate(180deg)'}}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'up')}} /><ActionBtn icon={<ChevronDown size={14}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'down')}} /><ActionBtn icon={<Copy size={14}/>} onClick={(e) => {e.stopPropagation(); duplicateBlock(block.id)}} /><ActionBtn icon={<Trash2 size={14}/>} color="#f75a68" onClick={(e) => {e.stopPropagation(); removeBlock(block.id)}} /></div>)}</div>))}</div>
+        <div style={{ flex: 1, minHeight: 0, background: '#09090a', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', overflowY: 'auto', overflowX: 'hidden' }}>
+          <div style={{ width: previewDevice === 'mobile' ? 375 : 600, minWidth: previewDevice === 'mobile' ? 375 : 600, transition: 'width 0.3s', background: 'white', minHeight: '100%', height: 'auto', overflow: 'visible', borderRadius: previewDevice === 'mobile' ? 30 : 4, paddingBottom: 40 }}>
+             <div style={{ padding: 0, overflow: 'visible' }}>{editorState.blocks.map((block) => (<div key={block.id} onClick={() => setSelectedBlockId(block.id)} style={{ position: 'relative', outline: selectedBlockId === block.id ? '2px solid #8257e6' : '1px dashed transparent', cursor: 'pointer' }}><div dangerouslySetInnerHTML={{ __html: generateHTML([block], '', '', false, npsPreviewContext) }} />{selectedBlockId === block.id && (<div className="block-actions" style={{ position: 'absolute', right: -40, top: 0, display: 'flex', flexDirection: 'column', gap: 5 }}><ActionBtn icon={<ChevronDown size={14} style={{transform:'rotate(180deg)'}}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'up')}} /><ActionBtn icon={<ChevronDown size={14}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'down')}} /><ActionBtn icon={<Copy size={14}/>} onClick={(e) => {e.stopPropagation(); duplicateBlock(block.id)}} /><ActionBtn icon={<Trash2 size={14}/>} color="#f75a68" onClick={(e) => {e.stopPropagation(); removeBlock(block.id)}} /></div>)}</div>))}</div>
           </div>
         </div>
-        <div style={{ width: 300, background: '#121214', borderLeft: '1px solid #29292e', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: 300, flexShrink: 0, background: '#121214', borderLeft: '1px solid #29292e', display: 'flex', flexDirection: 'column' }}>
            <div style={{ padding: 15, borderBottom: '1px solid #29292e', background: '#202024' }}><span style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>{currentBlock ? `EDITAR: ${currentBlock.type.toUpperCase()}` : 'PROPRIEDADES'}</span></div>
            <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
              {selectedBlockId && currentBlock ? (
                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                 {currentBlock.type === 'text' && <><RichTextEditor value={currentBlock.content.text} onChange={val => updateBlock(currentBlock.id, 'text', val)} /><AlignSelector value={currentBlock.style.align} onChange={val => updateBlock(currentBlock.id, 'align', val, true)} /><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></>}
+                 {currentBlock.type === 'text' && <><RichTextEditor value={currentBlock.content.text} onChange={val => updateBlock(currentBlock.id, 'text', val)} /><AlignSelector value={currentBlock.style.align} onChange={val => updateBlock(currentBlock.id, 'align', val, true)} /><label style={labelStyle}>Cor do texto</label><ColorPicker value={currentBlock.style.color} onChange={val => updateBlock(currentBlock.id, 'color', val, true)} /><label style={labelStyle}>Fonte</label><select value={currentBlock.style.fontFamily || 'sans-serif'} onChange={e => updateBlock(currentBlock.id, 'fontFamily', e.target.value, true)} style={inputStyle}><option value="sans-serif">Sans-serif</option><option value="Georgia, serif">Georgia</option><option value="'Times New Roman', serif">Times New Roman</option><option value="Arial, sans-serif">Arial</option><option value="monospace">Monospace</option></select><label style={labelStyle}>Cor de fundo</label><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></>}
                  
                  {currentBlock.type === 'image' && <><label style={uploadBtnStyle}><input type="file" hidden onChange={handleImageUpload} /> <ImageIcon size={16}/> Carregar</label><input value={currentBlock.style.width || '100%'} onChange={e => updateBlock(currentBlock.id, 'width', e.target.value, true)} style={inputStyle} /><label style={labelStyle}>Link da Imagem (Opcional)</label><input value={currentBlock.content.link || ''} onChange={e => updateBlock(currentBlock.id, 'link', e.target.value)} placeholder="https://..." style={inputStyle} /><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></>}
                  
                  {/* (Outros editores mantidos resumidos para caber visualmente) */}
                  {currentBlock.type === 'imagetext' && <><label style={uploadBtnStyle}><input type="file" hidden onChange={handleImageUpload} /> Imagem</label><input value={currentBlock.content.title} onChange={e => updateBlock(currentBlock.id, 'title', e.target.value)} style={inputStyle} /><textarea rows={4} value={currentBlock.content.text} onChange={e => updateBlock(currentBlock.id, 'text', e.target.value)} style={inputStyle} /></>}
                  {currentBlock.type === 'button' && <><input value={currentBlock.content.text} onChange={e => updateBlock(currentBlock.id, 'text', e.target.value)} style={inputStyle} /><input value={currentBlock.content.url} onChange={e => updateBlock(currentBlock.id, 'url', e.target.value)} style={inputStyle} /><ColorPicker value={currentBlock.style.buttonColor} onChange={val => updateBlock(currentBlock.id, 'buttonColor', val, true)} /></>}
-                 {currentBlock.type === 'spacer' && <><input type="range" min="10" max="100" value={currentBlock.style.height} onChange={e => updateBlock(currentBlock.id, 'height', e.target.value, true)} /><label style={{display:'flex',gap:10,fontSize:12,color:'#aaa',marginTop:5}}>Linha<input type="checkbox" checked={currentBlock.style.showLine} onChange={e => updateBlock(currentBlock.id, 'showLine', e.target.checked, true)} /></label></>}
+                 {currentBlock.type === 'spacer' && <><label style={labelStyle}>Altura do espaço</label><input type="range" min="10" max="100" value={currentBlock.style.height} onChange={e => updateBlock(currentBlock.id, 'height', e.target.value, true)} /><label style={{display:'flex',gap:10,fontSize:12,color:'#aaa',marginTop:5}}>Linha divisória<input type="checkbox" checked={currentBlock.style.showLine} onChange={e => updateBlock(currentBlock.id, 'showLine', e.target.checked, true)} /></label>{currentBlock.style.showLine && <><label style={labelStyle}>Cor da linha</label><ColorPicker value={currentBlock.style.lineColor} onChange={val => updateBlock(currentBlock.id, 'lineColor', val, true)} /></>}<label style={labelStyle}>Cor do espaço (fundo)</label><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></>}
                  
                  {/* CORREÇÃO 2: Links Sociais */}
                  {currentBlock.type === 'social' && <><label style={labelStyle}>Deixe vazio para ocultar</label><input placeholder="Instagram URL" value={currentBlock.content.instagram} onChange={e => updateBlock(currentBlock.id, 'instagram', e.target.value)} style={inputStyle}/><input placeholder="LinkedIn URL" value={currentBlock.content.linkedin} onChange={e => updateBlock(currentBlock.id, 'linkedin', e.target.value)} style={inputStyle}/><input placeholder="Site URL" value={currentBlock.content.website} onChange={e => updateBlock(currentBlock.id, 'website', e.target.value)} style={inputStyle}/><ColorPicker value={currentBlock.style.color} onChange={val => updateBlock(currentBlock.id, 'color', val, true)}/></>}
@@ -554,6 +631,19 @@ export default function Announcements() {
                        <div><label style={labelStyle}>Link do Logo (Opcional)</label><input value={currentBlock.content.url || ''} onChange={e => updateBlock(currentBlock.id, 'url', e.target.value)} placeholder="https://..." style={inputStyle} /></div>
                        <div><label style={labelStyle}>Cor de Fundo</label><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></div>
                        <div><label style={labelStyle}>Alinhamento</label><AlignSelector value={currentBlock.style.align} onChange={val => updateBlock(currentBlock.id, 'align', val, true)} /></div>
+                    </div>
+                 )}
+
+                 {currentBlock.type === 'nps' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+                       <label style={labelStyle}>Pergunta</label>
+                       <input value={currentBlock.content.prompt || ''} onChange={e => updateBlock(currentBlock.id, 'prompt', e.target.value)} placeholder="De 0 a 10, o quanto..." style={inputStyle} />
+                       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#a8a8b3' }}>
+                         <input type="checkbox" checked={!!currentBlock.content.useEmojis} onChange={e => updateBlock(currentBlock.id, 'useEmojis', e.target.checked)} />
+                         Usar emojis (0–10) em vez de números
+                       </label>
+                       <label style={labelStyle}>Cor de fundo</label>
+                       <ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} />
                     </div>
                  )}
                </div>

@@ -38,18 +38,13 @@ export default function ChannelView({ channels = [] }) {
   async function fetchMessages() {
     setLoading(true);
     try {
-      // Busca mensagens e quem enviou (join manual ou view seria ideal, aqui faremos simples)
       const { data: msgs, error } = await supabase
         .from('messages')
-        .select('*')
+        .select('*, profiles(full_name, avatar_url)')
         .eq('channel_id', channelId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-
-      // Como o Supabase simples não faz "join" automático fácil sem configuração, 
-      // vamos buscar os nomes dos usuários separadamente ou usar o user_id por enquanto.
-      // Para simplificar agora:
       setMessages(msgs || []);
     } catch (error) {
       console.error("Erro ao buscar mensagens:", error);
@@ -101,15 +96,21 @@ export default function ChannelView({ channels = [] }) {
       {/* Área de Mensagens */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {messages.map((msg) => {
-          const isMe = msg.user_id === user.id;
+          const isMe = msg.user_id === user?.id;
+          const displayName = isMe ? 'Você' : (msg.profiles?.full_name || 'Usuário');
+          const avatarUrl = msg.profiles?.avatar_url;
           return (
             <div key={msg.id} style={{ display: 'flex', gap: '15px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: isMe ? '#8257e6' : '#323238', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <User size={20} color="white" />
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: isMe ? '#8257e6' : '#323238', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <User size={20} color="white" />
+                )}
               </div>
               <div style={{ maxWidth: '70%' }}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 5, flexDirection: isMe ? 'row-reverse' : 'row' }}>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>{isMe ? 'Você' : 'Usuário'}</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>{displayName}</span>
                   <span style={{ color: '#7c7c8a', fontSize: 12 }}>{new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                 </div>
                 <div style={{ 
