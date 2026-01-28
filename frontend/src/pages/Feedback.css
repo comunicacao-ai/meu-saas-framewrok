@@ -1,0 +1,202 @@
+/* Feedback.css */
+.feedback-container {
+    min-height: 100vh;
+    width: 100%;
+    background-color: #09090a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    font-family: sans-serif;
+  }
+  
+  /* Fundo com Luzes */
+  .bg-light-purple {
+    position: absolute;
+    top: -10%;
+    left: -10%;
+    width: 500px;
+    height: 500px;
+    background-color: #8257e6;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.2;
+    pointer-events: none;
+  }
+  
+  .bg-light-green {
+    position: absolute;
+    bottom: -10%;
+    right: -10%;
+    width: 500px;
+    height: 500px;
+    background-color: #00B37E;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.1;
+    pointer-events: none;
+  }
+  
+  /* O Cartão de Vidro */
+  .glass-card {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 480px;
+    background-color: rgba(32, 32, 36, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Header do Cartão */
+  .card-header {
+    padding: 40px 30px 20px;
+    text-align: center;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.05), transparent);
+  }
+  
+  .preview-badge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(234, 179, 8, 0.2);
+    border-bottom: 1px solid rgba(234, 179, 8, 0.1);
+    color: #eab308;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    padding: 6px 0;
+    text-align: center;
+  }
+  
+  .score-circle {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 24px;
+    background: linear-gradient(135deg, #8257e6, #00B37E);
+    border-radius: 50%;
+    padding: 2px;
+    box-shadow: 0 10px 30px rgba(130, 87, 230, 0.3);
+  }
+  
+  .score-inner {
+    width: 100%;
+    height: 100%;
+    background-color: #202024;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  
+  .score-number {
+    font-size: 42px;
+    font-weight: bold;
+    color: white;
+  }
+  
+  .title {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    margin: 0 0 8px 0;
+  }
+  
+  .subtitle {
+    color: #a8a8b3;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+  }
+  
+  /* Formulário */
+  .card-body {
+    padding: 30px;
+    padding-top: 10px;
+  }
+  
+  .label-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: #7c7c8a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  textarea.input-area {
+    width: 100%;
+    background-color: #121214;
+    border: 1px solid #323238;
+    border-radius: 12px;
+    padding: 16px;
+    color: white;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    font-size: 14px;
+    transition: border-color 0.2s;
+    box-sizing: border-box; /* Importante para não vazar */
+  }
+  
+  textarea.input-area:focus {
+    border-color: #8257e6;
+  }
+  
+  .btn-submit {
+    width: 100%;
+    margin-top: 15px;
+    background-color: #8257e6;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: background-color 0.2s;
+  }
+  
+  .btn-submit:hover {
+    background-color: #996DFF;
+  }
+  
+  .btn-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  /* Footer */
+  .card-footer {
+    background-color: rgba(24, 24, 27, 0.8);
+    padding: 15px;
+    text-align: center;
+    border-top: 1px solid #323238;
+  }
+  
+  .footer-text {
+    color: #505059;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 0;
+  }
