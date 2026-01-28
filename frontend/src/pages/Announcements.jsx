@@ -1,13 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient'; 
 import { 
   Plus, Search, BarChart2, X, Image as ImageIcon, Type, 
   Layout, Trash2, ArrowLeft, Save, Send, MousePointerClick, Users, Tag,
-  Eye, Mail, Loader2, CheckCircle, AlertTriangle, ChevronDown, 
-  CheckSquare, Square, Bold, Italic, Smartphone, Monitor,
+  Eye, Mail, Loader2, AlertTriangle, ChevronDown, 
+  Bold, Italic, Smartphone, Monitor,
   AlignLeft, AlignCenter, AlignRight, Copy, Share2, Columns, Minus,
-  TrendingUp, List, Activity, Link as LinkIcon, Smile
+  TrendingUp, List, Activity, Smile
 } from 'lucide-react';
+import './Audience.css';
+
+// ============================================================================
+// 1. CONSTANTES E UTILITÁRIOS
+// ============================================================================
 
 const VARIABLES = [
   { label: 'Nome', value: '{{name}}' },
@@ -16,90 +21,126 @@ const VARIABLES = [
   { label: 'Cargo', value: '{{cargo}}' },
   { label: 'Primeiro nome', value: '{{primeiro_nome}}' },
 ];
-import './Audience.css';
+
+const BLOCK_TYPES = [
+  { type: 'header', icon: <Layout size={18} />, label: 'Topo' },
+  { type: 'text', icon: <Type size={18} />, label: 'Texto' },
+  { type: 'imagetext', icon: <Columns size={18} />, label: 'Img + Texto' },
+  { type: 'image', icon: <ImageIcon size={18} />, label: 'Imagem' },
+  { type: 'button', icon: <MousePointerClick size={18} />, label: 'Botão' },
+  { type: 'social', icon: <Share2 size={18} />, label: 'Social' },
+  { type: 'spacer', icon: <Minus size={18} />, label: 'Espaço' },
+  { type: 'nps', icon: <Smile size={18} />, label: 'Pesquisa/NPS' },
+];
+
+// Estilos reutilizáveis do painel lateral
+const styles = {
+  sectionTitle: { fontSize: 11, fontWeight: 'bold', color: '#7c7c8a', marginBottom: 15, letterSpacing: 1 },
+  label: { fontSize: 12, color: '#a8a8b3', marginBottom: 6, display: 'block', fontWeight: '500' },
+  input: { width: '100%', padding: 10, background: '#202024', border: '1px solid #323238', color: 'white', borderRadius: 6, fontSize: 14, outline: 'none' },
+  th: { textAlign:'left', padding:'10px 15px', fontSize:11, color:'#7c7c8a', textTransform:'uppercase' },
+  td: { padding:'10px 15px', fontSize:13, color:'white' },
+  tagPill: { background:'#29292e', padding:'2px 6px', borderRadius:4, fontSize:10, marginRight:5, border:'1px solid #323238', color:'#ccc' }
+};
 
 // ============================================================================
-// 1. HELPER: GERADOR DE HTML
+// 2. GERADOR DE HTML (ENGINE DE EMAIL)
 // ============================================================================
+
 const generateHTML = (blocks, subject, previewText, isFinalTemplate = true, npsContext = null) => {
   const base = npsContext?.baseUrl ?? '{{base_url}}';
   const cid = npsContext?.campaignId ?? '{{campaign_id}}';
   const contactId = npsContext?.contactId ?? '{{contact_id}}';
+  
   let bodyContent = '';
+
   blocks.forEach(block => {
     const s = block.style || {};
     const c = block.content || {};
     let blockHTML = '';
+
     switch (block.type) {
-      case 'header':
-        // CORREÇÃO 2: Se tiver link no header, envolve a imagem/texto numa tag <a>
-        const contentHeader = c.imageUrl 
-          ? `<img src="${c.imageUrl}" alt="Logo" style="max-width: 200px; height: auto; border: 0;">` 
+      case 'header': {
+        const imgContent = c.imageUrl 
+          ? `<img src="${c.imageUrl}" alt="Logo" style="max-width: 200px; height: auto; border: 0; display: block;">` 
           : `<h2 style="margin: 0; color: ${s.color}; font-family: sans-serif;">LOGO</h2>`;
         
-        const finalHeader = c.url 
-          ? `<a href="${c.url}" target="_blank" style="text-decoration:none;">${contentHeader}</a>` 
-          : contentHeader;
+        // Envolve em <a> se houver URL
+        const finalContent = c.url 
+          ? `<a href="${c.url}" target="_blank" style="text-decoration:none;">${imgContent}</a>` 
+          : imgContent;
 
-        blockHTML = `<tr><td align="${s.align}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};">${finalHeader}</td></tr>`;
+        blockHTML = `<tr><td align="${s.align}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};">${finalContent}</td></tr>`;
         break;
+      }
 
-      case 'text':
+      case 'text': {
         let txt = c.text || ''; 
         if(!txt.includes('<')) txt = txt.replace(/\n/g, '<br/>');
         blockHTML = `<tr><td align="${s.align}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><div style="font-family: ${s.fontFamily || 'sans-serif'}; font-size: ${s.fontSize}px; color: ${s.color}; line-height: 1.6;">${txt}</div></td></tr>`;
         break;
+      }
 
-      case 'image':
+      case 'image': {
         const imgTag = `<img src="${c.url}" alt="Imagem" style="max-width: 100%; width: ${s.width || '100%'}; border-radius: ${s.borderRadius}px; display: block; margin: 0 auto;">`;
-        // Opção de link na imagem full também
-        const finalImg = c.link ? `<a href="${c.link}" target="_blank">${imgTag}</a>` : imgTag;
+        const finalImg = c.link ? `<a href="${c.link}" target="_blank" style="text-decoration:none;">${imgTag}</a>` : imgTag;
         blockHTML = `<tr><td align="${s.align}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};">${finalImg}</td></tr>`;
         break;
+      }
 
-      case 'button':
-        blockHTML = `<tr><td align="${s.align}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><a href="${c.url}" style="display: inline-block; padding: 12px 24px; background-color: ${s.buttonColor}; color: ${s.textColor}; text-decoration: none; border-radius: ${s.borderRadius}px; font-weight: bold; font-family: sans-serif; font-size: 16px;">${c.text}</a></td></tr>`;
+      case 'button': {
+        blockHTML = `<tr><td align="${s.align}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><a href="${c.url}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: ${s.buttonColor}; color: ${s.textColor}; text-decoration: none; border-radius: ${s.borderRadius}px; font-weight: bold; font-family: sans-serif; font-size: 16px;">${c.text}</a></td></tr>`;
         break;
+      }
 
-      case 'spacer':
+      case 'spacer': {
         blockHTML = `<tr><td style="padding: 0; background-color: ${s.backgroundColor};"><div style="height: ${s.height}px; line-height: ${s.height}px; font-size: 0;">&nbsp;</div>${s.showLine ? `<div style="height: 1px; background-color: ${s.lineColor}; line-height: 1px; font-size: 0;">&nbsp;</div>` : ''}${s.showLine ? `<div style="height: ${s.height}px; line-height: ${s.height}px; font-size: 0;">&nbsp;</div>` : ''}</td></tr>`;
         break;
+      }
 
-      case 'social':
-        // CORREÇÃO 2: Só mostra o link se o campo não estiver vazio
+      case 'social': {
         let socialLinks = '';
-        if (c.instagram) socialLinks += `<a href="${c.instagram}" style="margin: 0 5px; text-decoration: none; color: ${s.color}; font-weight: bold; font-family: sans-serif;">Instagram</a>`;
-        if (c.linkedin) socialLinks += `<a href="${c.linkedin}" style="margin: 0 5px; text-decoration: none; color: ${s.color}; font-weight: bold; font-family: sans-serif;">LinkedIn</a>`;
-        if (c.website) socialLinks += `<a href="${c.website}" style="margin: 0 5px; text-decoration: none; color: ${s.color}; font-weight: bold; font-family: sans-serif;">Site</a>`;
+        const linkStyle = `margin: 0 8px; text-decoration: none; color: ${s.color}; font-weight: bold; font-family: sans-serif; font-size: 14px;`;
+        if (c.instagram) socialLinks += `<a href="${c.instagram}" target="_blank" style="${linkStyle}">Instagram</a>`;
+        if (c.linkedin) socialLinks += `<a href="${c.linkedin}" target="_blank" style="${linkStyle}">LinkedIn</a>`;
+        if (c.website) socialLinks += `<a href="${c.website}" target="_blank" style="${linkStyle}">Site</a>`;
 
-        blockHTML = `<tr><td align="center" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><p style="margin: 0; font-family: sans-serif; font-size: 12px; color: #999;">Siga-nos nas redes</p><div style="margin-top: 10px;">${socialLinks}</div></td></tr>`;
+        blockHTML = `<tr><td align="center" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><p style="margin: 0 0 10px 0; font-family: sans-serif; font-size: 12px; color: #999;">Siga-nos</p><div>${socialLinks}</div></td></tr>`;
         break;
+      }
 
-      case 'imagetext':
-        blockHTML = `<tr><td style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="40%" valign="middle" style="padding-right: 15px;"><img src="${c.url}" style="width: 100%; border-radius: 4px; display: block;" /></td><td width="60%" valign="middle" style="font-family: sans-serif; font-size: 14px; color: ${s.color}; line-height: 1.5;"><strong style="font-size: 16px;">${c.title}</strong><br/>${c.text}</td></tr></table></td></tr>`;
+      case 'imagetext': {
+        blockHTML = `<tr><td style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="40%" valign="middle" style="padding-right: 15px;"><img src="${c.url}" style="width: 100%; border-radius: 4px; display: block;" /></td><td width="60%" valign="middle" style="font-family: sans-serif; font-size: 14px; color: ${s.color}; line-height: 1.5;"><strong style="font-size: 16px; display:block; margin-bottom:5px;">${c.title}</strong>${c.text}</td></tr></table></td></tr>`;
         break;
+      }
 
-      case 'nps':
+      case 'nps': {
         const npsPrompt = c.prompt || 'De 0 a 10, o quanto você recomenda nossa equipe?';
         const useEmojis = c.useEmojis;
         let npsBtns = '';
         const emojis = ['😞','🙁','😐','🙂','😊','😄','🤩','😍','🔥','🌟','💯'];
+        
         for (let i = 0; i <= 10; i++) {
-          const href = `${base}/feedback/${cid}/${contactId}/${i}`;
+          // Link format: /feedback/:campaignId/:contactId/:score
+          const href = `${base}/feedback/${cid}/${contactId}/${i}`; 
           const label = useEmojis ? emojis[i] : String(i);
-          npsBtns += `<a href="${href}" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;margin:2px;background:#8257e6;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;font-size:14px;">${label}</a>`;
+          npsBtns += `<a href="${href}" target="_blank" style="display:inline-block;width:32px;height:32px;line-height:32px;text-align:center;margin:3px;background:#8257e6;color:#fff;text-decoration:none;border-radius:4px;font-weight:bold;font-family:sans-serif;font-size:14px;">${label}</a>`;
         }
-        blockHTML = `<tr><td align="${s.align || 'center'}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><p style="margin:0 0 12px 0;font-family:sans-serif;font-size:14px;color:#333;">${npsPrompt}</p><div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;">${npsBtns}</div></td></tr>`;
+        
+        blockHTML = `<tr><td align="${s.align || 'center'}" style="padding: ${s.padding}px; background-color: ${s.backgroundColor};"><p style="margin:0 0 15px 0;font-family:sans-serif;font-size:16px;color:#333;font-weight:600;">${npsPrompt}</p><div>${npsBtns}</div></td></tr>`;
         break;
+      }
     }
     bodyContent += blockHTML;
   });
+
   if (!isFinalTemplate) return `<table width="100%" cellpadding="0" cellspacing="0" border="0">${bodyContent}</table>`;
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${subject}</title></head><body style="margin: 0; padding: 0; background-color: #f4f4f7;"><div style="display: none; max-height: 0px; overflow: hidden;">${previewText || ''}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div><table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f7;"><tr><td align="center" style="padding: 20px 0;"><table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; max-width: 600px; width: 100%;">${bodyContent}<tr><td align="center" style="padding: 30px; background-color: #f4f4f7; color: #888; font-family: sans-serif; font-size: 12px; border-top: 1px solid #e1e1e6;"><p style="margin: 0;">Produzido e disparado pela equipe de comunicação interna da <strong>Framework Digital</strong></p><p style="margin: 5px 0 0 0;"><a href="https://forms.gle/3xFpT2Z8pW5TrhXU9" style="color: #888; text-decoration: underline;">Não quero mais receber este tipo de e-mail!</a></p></td></tr></table></td></tr></table></body></html>`;
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${subject}</title></head><body style="margin: 0; padding: 0; background-color: #f4f4f7;"><div style="display: none; max-height: 0px; overflow: hidden;">${previewText || ''}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div><table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f7;"><tr><td align="center" style="padding: 20px 0;"><table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; max-width: 600px; width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">${bodyContent}<tr><td align="center" style="padding: 30px; background-color: #f4f4f7; color: #888; font-family: sans-serif; font-size: 12px; border-top: 1px solid #e1e1e6;"><p style="margin: 0;">Produzido e disparado pela equipe de comunicação interna da <strong>Framework Digital</strong></p><p style="margin: 5px 0 0 0;"><a href="https://forms.gle/3xFpT2Z8pW5TrhXU9" style="color: #888; text-decoration: underline;">Não quero mais receber este tipo de e-mail!</a></p></td></tr></table></td></tr></table></body></html>`;
 };
 
 // ============================================================================
-// 2. COMPONENTES AUXILIARES
+// 3. COMPONENTES DE UI
 // ============================================================================
 
 const KPICard = ({ title, value, subtitle, color, icon }) => (
@@ -114,7 +155,7 @@ const KPICard = ({ title, value, subtitle, color, icon }) => (
 );
 
 const BlockCard = ({ icon, label, onClick }) => (
-  <button onClick={onClick} style={{ background: '#202024', border: '1px solid #323238', borderRadius: 6, padding: '15px 10px', color: '#e1e1e6', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+  <button onClick={onClick} style={{ background: '#202024', border: '1px solid #323238', borderRadius: 6, padding: '15px 10px', color: '#e1e1e6', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.currentTarget.style.borderColor='#8257e6'} onMouseOut={e => e.currentTarget.style.borderColor='#323238'}>
     <div style={{ color: '#8257e6' }}>{icon}</div><span style={{ fontSize: 12 }}>{label}</span>
   </button>
 );
@@ -128,54 +169,6 @@ const TabButton = ({ active, onClick, label, icon }) => (
 const ActionBtn = ({ icon, onClick, color }) => (
   <button onClick={onClick} style={{ width: 26, height: 26, borderRadius: 4, background: color ? color : '#202024', border: '1px solid #323238', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>{icon}</button>
 );
-
-// CORREÇÃO 3: Melhorado o Editor de Texto para não perder foco e não juntar linhas
-function RichTextEditor({ value, onChange }) {
-  const ref = useRef(null);
-  
-  const insert = (e, before, after = '') => {
-    e.preventDefault();
-    const input = ref.current;
-    if (!input) return;
-    const start = input.selectionStart;
-    const end = input.selectionEnd;
-    const txt = input.value;
-    const newTxt = txt.substring(0, start) + before + txt.substring(start, end) + after + txt.substring(end);
-    onChange(newTxt);
-    setTimeout(() => { input.focus(); input.setSelectionRange(start + before.length, end + before.length + (end - start)); }, 0);
-  };
-
-  const insertVar = (e) => {
-    const v = e.target.value;
-    if (!v) return;
-    insert(e, v, '');
-    e.target.value = '';
-  };
-
-  return (
-    <div style={{ border: '1px solid #323238', borderRadius: 6, overflow: 'hidden' }}>
-      <div style={{ background: '#202024', padding: 5, borderBottom: '1px solid #323238', display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-        <ToolBtn icon={<Bold size={14}/>} onClick={(e) => insert(e, '<b>', '</b>')}/>
-        <ToolBtn icon={<Italic size={14}/>} onClick={(e) => insert(e, '<i>', '</i>')}/>
-        <div style={{ width: 1, background: '#323238', margin: '0 4px', alignSelf: 'stretch' }} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#a8a8b3' }}>
-          Inserir variável:
-          <select onChange={insertVar} style={{ background: '#121214', border: '1px solid #323238', color: 'white', borderRadius: 4, padding: '4px 6px', fontSize: 11, cursor: 'pointer' }}>
-            <option value="">—</option>
-            {VARIABLES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
-          </select>
-        </label>
-      </div>
-      <textarea 
-        ref={ref} 
-        value={value} 
-        onChange={e => onChange(e.target.value)} 
-        rows={6} 
-        style={{ width: '100%', background: '#121214', color: 'white', border: 'none', padding: 10, outline: 'none', fontSize: 14, fontFamily: 'sans-serif' }} 
-      />
-    </div>
-  );
-}
 
 const ToolBtn = ({ icon, text, onClick }) => (
   <button onClick={onClick} style={{ background: 'transparent', border: 'none', color: '#a8a8b3', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 11, display:'flex', alignItems:'center' }} onMouseOver={e=>e.currentTarget.style.bg='#29292e'}>
@@ -200,15 +193,58 @@ const AlignSelector = ({ value, onChange }) => (
   </div>
 );
 
-const sectionTitleStyle = { fontSize: 11, fontWeight: 'bold', color: '#7c7c8a', marginBottom: 15, letterSpacing: 1 };
-const labelStyle = { fontSize: 12, color: '#a8a8b3', marginBottom: 6, display: 'block', fontWeight: '500' };
-const inputStyle = { width: '100%', padding: 10, background: '#202024', border: '1px solid #323238', color: 'white', borderRadius: 6, fontSize: 14, outline: 'none' };
-const uploadBtnStyle = { ...inputStyle, textAlign: 'center', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#29292e' };
-const actionLinkStyle = { background: 'none', border: 'none', color: '#8257e6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 };
-const thStyle = { textAlign:'left', padding:'10px 15px', fontSize:11, color:'#7c7c8a', textTransform:'uppercase' };
-const tdStyle = { padding:'10px 15px', fontSize:13, color:'white' };
-const tagPillStyle = { background:'#29292e', padding:'2px 6px', borderRadius:4, fontSize:10, marginRight:5, border:'1px solid #323238', color:'#ccc' };
+// Editor de Texto Rico Melhorado (com preservação de cursor e foco)
+function RichTextEditor({ value, onChange }) {
+  const ref = useRef(null);
+  
+  const insert = (e, before, after = '') => {
+    e.preventDefault();
+    const input = ref.current;
+    if (!input) return;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const txt = input.value;
+    const newTxt = txt.substring(0, start) + before + txt.substring(start, end) + after + txt.substring(end);
+    
+    onChange(newTxt);
+    
+    // Restaura o foco e a posição do cursor
+    setTimeout(() => { 
+      input.focus(); 
+      input.setSelectionRange(start + before.length, end + before.length + (end - start)); 
+    }, 0);
+  };
 
+  const insertVar = (e) => {
+    const v = e.target.value;
+    if (!v) return;
+    insert(e, v, '');
+    e.target.value = '';
+  };
+
+  return (
+    <div style={{ border: '1px solid #323238', borderRadius: 6, overflow: 'hidden' }}>
+      <div style={{ background: '#202024', padding: 5, borderBottom: '1px solid #323238', display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+        <ToolBtn icon={<Bold size={14}/>} onClick={(e) => insert(e, '<b>', '</b>')}/>
+        <ToolBtn icon={<Italic size={14}/>} onClick={(e) => insert(e, '<i>', '</i>')}/>
+        <div style={{ width: 1, height: 14, background: '#323238', margin: '0 4px' }} />
+        <select onChange={insertVar} style={{ background: '#121214', border: '1px solid #323238', color: 'white', borderRadius: 4, padding: '2px 6px', fontSize: 11, cursor: 'pointer', maxWidth: 100 }}>
+          <option value="">Variável...</option>
+          {VARIABLES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
+        </select>
+      </div>
+      <textarea 
+        ref={ref} 
+        value={value} 
+        onChange={e => onChange(e.target.value)} 
+        rows={8} 
+        style={{ width: '100%', background: '#121214', color: 'white', border: 'none', padding: 10, outline: 'none', fontSize: 14, fontFamily: 'sans-serif', resize: 'vertical' }} 
+      />
+    </div>
+  );
+}
+
+// Configurações padrão de blocos
 function getDefaultContent(type) {
   if (type === 'text') return { text: 'Olá, {{name}}! Escreva sua mensagem aqui.' };
   if (type === 'button') return { text: 'Clique Aqui', url: 'https://' };
@@ -233,7 +269,7 @@ function getDefaultStyle(type) {
 }
 
 // ============================================================================
-// 3. VIEWS (TELAS)
+// 4. TELAS (VIEWS)
 // ============================================================================
 
 const ListView = ({ campaigns, onNew, onEdit, onViewDash }) => {
@@ -261,7 +297,7 @@ const ListView = ({ campaigns, onNew, onEdit, onViewDash }) => {
                   <td><span className={`status-badge ${camp.status === 'sent' ? 'status-active' : 'status-inactive'}`}>{camp.status === 'sent' ? 'Enviado' : 'Rascunho'}</span></td>
                   <td style={{ color: 'white', fontWeight:'500' }}>{camp.title || camp.subject}</td>
                   <td style={{color:'#a8a8b3'}}>{new Date(camp.created_at).toLocaleDateString()}</td>
-                  <td>{camp.status === 'draft' ? <button onClick={() => onEdit(camp)} style={actionLinkStyle}>Editar</button> : <button onClick={() => onViewDash(camp)} style={actionLinkStyle}><BarChart2 size={16}/> Relatório</button>}</td>
+                  <td>{camp.status === 'draft' ? <button onClick={() => onEdit(camp)} style={{...styles.input, width:'auto', background:'none', border:'none', color:'#8257e6', cursor:'pointer'}}>Editar</button> : <button onClick={() => onViewDash(camp)} style={{...styles.input, width:'auto', background:'none', border:'none', color:'#8257e6', cursor:'pointer', display:'flex', alignItems:'center', gap:5}}><BarChart2 size={16}/> Relatório</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -282,11 +318,7 @@ const DashboardView = ({ campaign, onBack }) => {
   }, [campaign]);
 
   async function fetchNps() {
-    const { data: res } = await supabase
-      .from('campaign_responses')
-      .select('*')
-      .eq('campaign_id', campaign.id)
-      .order('created_at', { ascending: false });
+    const { data: res } = await supabase.from('campaign_responses').select('*').eq('campaign_id', campaign.id).order('created_at', { ascending: false });
     if (!res || res.length === 0) { setNpsResponses([]); return; }
     const contactIds = [...new Set(res.map(r => r.contact_id))];
     const { data: contacts } = await supabase.from('contacts').select('id, name, email').in('id', contactIds);
@@ -296,36 +328,18 @@ const DashboardView = ({ campaign, onBack }) => {
 
   async function fetchEvents() {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('campaign_events')
-      .select('*')
-      .eq('campaign_id', campaign.id)
-      .order('created_at', { ascending: false });
-
-    if (!error && data && data.length > 0) {
+    const { data, error } = await supabase.from('campaign_events').select('*').eq('campaign_id', campaign.id).order('created_at', { ascending: false });
+    if (!error && data) {
       setEvents(data);
       calculateTagRanking(data);
-    } else {
-      const mock = [
-        { id: 1, email: 'exemplo@empresa.com', event_type: 'delivered', created_at: new Date().toISOString(), contact_tags: ['Exemplo'] }
-      ];
-      setEvents(mock);
-      calculateTagRanking(mock);
     }
     setIsLoading(false);
   }
 
   function calculateTagRanking(data) {
     const counts = {};
-    data.forEach(ev => {
-      if (ev.contact_tags) {
-        ev.contact_tags.forEach(tag => {
-          counts[tag] = (counts[tag] || 0) + 1;
-        });
-      }
-    });
-    const ranked = Object.entries(counts).map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count);
-    setTagRanking(ranked);
+    data.forEach(ev => { if (ev.contact_tags) ev.contact_tags.forEach(tag => counts[tag] = (counts[tag] || 0) + 1); });
+    setTagRanking(Object.entries(counts).map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count));
   }
 
   const opens = events.filter(e => e.event_type === 'open' || e.event_type === 'delivered').slice(0, 10);
@@ -351,31 +365,7 @@ const DashboardView = ({ campaign, onBack }) => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ background: '#202024', borderRadius: 8, border: '1px solid #323238', overflow:'hidden' }}>
-             <div style={{ padding: 15, borderBottom: '1px solid #323238', display:'flex', gap:10, alignItems:'center' }}><List size={18} color="#00B37E"/><span style={{fontWeight:'bold', color:'white'}}>Últimos Envios / Aberturas</span></div>
-             <table style={{width:'100%', borderCollapse:'collapse'}}>
-               <thead style={{background:'#121214'}}><tr><th style={thStyle}>E-mail</th><th style={thStyle}>Data</th><th style={thStyle}>Tags</th></tr></thead>
-               <tbody>
-                 {opens.map(ev => (
-                   <tr key={ev.id} style={{borderBottom:'1px solid #29292e'}}><td style={tdStyle}>{ev.email}</td><td style={tdStyle}>{new Date(ev.created_at).toLocaleTimeString()}</td><td style={tdStyle}>{ev.contact_tags?.map(t=><span key={t} style={tagPillStyle}>{t}</span>)}</td></tr>
-                 ))}
-                 {opens.length === 0 && <tr><td colSpan={3} style={{padding:20, textAlign:'center', color:'#555'}}>Nenhum envio registrado.</td></tr>}
-               </tbody>
-             </table>
-          </div>
-          <div style={{ background: '#202024', borderRadius: 8, border: '1px solid #f75a6850', overflow:'hidden' }}>
-             <div style={{ padding: 15, borderBottom: '1px solid #323238', display:'flex', gap:10, alignItems:'center' }}><AlertTriangle size={18} color="#f75a68"/><span style={{fontWeight:'bold', color:'white'}}>Erros de Entrega (Bounce)</span></div>
-             <table style={{width:'100%', borderCollapse:'collapse'}}>
-               <thead style={{background:'#290000'}}><tr><th style={thStyle}>E-mail</th><th style={thStyle}>Status</th></tr></thead>
-               <tbody>
-                 {bounces.map(ev => (
-                   <tr key={ev.id} style={{borderBottom:'1px solid #29292e'}}><td style={{...tdStyle, color:'#f75a68'}}>{ev.email}</td><td style={tdStyle}>Falha na entrega</td></tr>
-                 ))}
-                 {bounces.length === 0 && <tr><td colSpan={2} style={{padding:20, textAlign:'center', color:'#7c7c8a'}}>Nenhum erro encontrado! 🎉</td></tr>}
-               </tbody>
-             </table>
-          </div>
-
+          {/* NPS Section */}
           <div style={{ background: '#202024', borderRadius: 8, border: '1px solid #8257e650', overflow:'hidden' }}>
             <div style={{ padding: 15, borderBottom: '1px solid #323238', display:'flex', gap:10, alignItems:'center' }}><Smile size={18} color="#8257e6"/><span style={{fontWeight:'bold', color:'white'}}>Satisfação / NPS</span></div>
             <div style={{ padding: 15 }}>
@@ -386,14 +376,14 @@ const DashboardView = ({ campaign, onBack }) => {
                 </div>
               )}
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={{ background: '#121214' }}><tr><th style={thStyle}>Contato</th><th style={thStyle}>NPS</th><th style={thStyle}>Comentário</th><th style={thStyle}>Data</th></tr></thead>
+                <thead style={{ background: '#121214' }}><tr><th style={styles.th}>Contato</th><th style={styles.th}>NPS</th><th style={styles.th}>Comentário</th><th style={styles.th}>Data</th></tr></thead>
                 <tbody>
                   {npsResponses.map(r => (
                     <tr key={r.id} style={{ borderBottom: '1px solid #29292e' }}>
-                      <td style={tdStyle}>{r.contact?.name || r.contact?.email || '-'}</td>
-                      <td style={tdStyle}>{r.score}</td>
-                      <td style={{ ...tdStyle, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.comment || ''}>{r.comment || '-'}</td>
-                      <td style={tdStyle}>{new Date(r.created_at).toLocaleString()}</td>
+                      <td style={styles.td}>{r.contact?.name || r.contact?.email || '-'}</td>
+                      <td style={styles.td}>{r.score}</td>
+                      <td style={{ ...styles.td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.comment || ''}>{r.comment || '-'}</td>
+                      <td style={styles.td}>{new Date(r.created_at).toLocaleString()}</td>
                     </tr>
                   ))}
                   {npsResponses.length === 0 && <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: '#7c7c8a' }}>Nenhuma resposta NPS ainda.</td></tr>}
@@ -402,30 +392,13 @@ const DashboardView = ({ campaign, onBack }) => {
             </div>
           </div>
         </div>
-        <div style={{ background: '#202024', borderRadius: 8, border: '1px solid #323238', height:'fit-content' }}>
-          <div style={{ padding: 15, borderBottom: '1px solid #323238', display:'flex', gap:10, alignItems:'center' }}><TrendingUp size={18} color="#8257e6"/><span style={{fontWeight:'bold', color:'white'}}>Ranking de Tags</span></div>
-          <div style={{ padding: 15 }}>
-            {tagRanking.map((item, i) => (
-              <div key={item.tag} style={{ marginBottom: 15 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5, fontSize:12 }}>
-                  <span style={{color:'white'}}>{i+1}. {item.tag}</span>
-                  <span style={{color:'#8257e6', fontWeight:'bold'}}>{item.count} envios</span>
-                </div>
-                <div style={{ width: '100%', height: 6, background: '#121214', borderRadius: 3, overflow:'hidden' }}>
-                  <div style={{ width: `${(item.count / (tagRanking[0]?.count || 1)) * 100}%`, height: '100%', background: '#8257e6', borderRadius: 3 }}></div>
-                </div>
-              </div>
-            ))}
-            {tagRanking.length === 0 && <p style={{textAlign:'center', color:'#555', fontSize:12}}>Sem dados suficientes.</p>}
-          </div>
-        </div>
       </div>
     </div>
   );
 };
 
 // ============================================================================
-// 4. COMPONENTE PRINCIPAL (EXPORTADO NO FINAL)
+// 5. COMPONENTE PRINCIPAL (EXPORTADO)
 // ============================================================================
 
 export default function Announcements() {
@@ -433,7 +406,6 @@ export default function Announcements() {
   const [loading, setLoading] = useState(false);
   const [campaigns, setCampaigns] = useState([]);
   const [availableTags, setAvailableTags] = useState([]); 
-  const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
 
   const [editorState, setEditorState] = useState({
     id: null, subject: '', previewText: '', audienceType: 'all', tags: [], blocks: [] 
@@ -462,8 +434,10 @@ export default function Announcements() {
     if (!email) return;
     setLoading(true);
     try {
-      const npsCtx = typeof window !== 'undefined' ? { baseUrl: window.location.origin, campaignId: editorState.id || 'preview', contactId: '11111111-1111-1111-1111-111111111111' } : null;
+      // Contexto falso para preview do NPS
+      const npsCtx = typeof window !== 'undefined' ? { baseUrl: window.location.origin, campaignId: editorState.id || 'preview', contactId: 'preview-contact-id' } : null;
       const htmlBody = generateHTML(editorState.blocks, `[TESTE] ${editorState.subject}`, editorState.previewText, true, npsCtx);
+      
       const { error } = await supabase.functions.invoke('send-email', {
         body: { type: 'test', to: email, subject: `[TESTE] ${editorState.subject}`, html: htmlBody, variables: { name: 'Visitante Teste' } }
       });
@@ -481,15 +455,18 @@ export default function Announcements() {
     if (!editorState.subject) return alert("Ei! Dê um assunto para sua campanha.");
     setLoading(true);
     const isSending = status === 'sent';
+    
+    // Prepara payload para banco
     const payload = {
       title: editorState.subject,
       content: editorState.blocks,
-      status: isSending ? 'draft' : status,
+      status: isSending ? 'draft' : status, // Se for enviar, salva como draft primeiro, dps atualiza
       updated_at: new Date(),
-      ...(editorState.previewText && { preview_text: editorState.previewText }),
-      ...(editorState.audienceType && { audience_type: editorState.audienceType }),
-      ...(editorState.tags?.length > 0 && { tags: editorState.tags })
+      preview_text: editorState.previewText,
+      audience_type: editorState.audienceType,
+      tags: editorState.tags
     };
+
     try {
       let savedId = editorState.id;
       if (editorState.id) {
@@ -499,6 +476,7 @@ export default function Announcements() {
         if (error) throw error;
         savedId = data[0].id;
       }
+
       if (status === 'draft') {
         alert("Rascunho salvo!");
         fetchCampaigns();
@@ -506,6 +484,7 @@ export default function Announcements() {
         return;
       }
 
+      // Se for envio real
       const htmlBody = generateHTML(editorState.blocks, editorState.subject, editorState.previewText, true);
       const invokePayload = {
         type: 'campaign',
@@ -516,13 +495,10 @@ export default function Announcements() {
         tags: editorState.tags ?? [],
         baseUrl: typeof window !== 'undefined' ? window.location.origin : ''
       };
-      console.log('[handleSave] Enviando para send-email. Payload:', { ...invokePayload, html: '(html omitido)' });
-      const { data: fnData, error } = await supabase.functions.invoke('send-email', { body: invokePayload });
-      console.log('[handleSave] Resposta send-email:', { data: fnData, error: error?.message ?? null });
 
+      const { data: fnData, error } = await supabase.functions.invoke('send-email', { body: invokePayload });
       if (error) throw error;
-      const ok = fnData && !fnData.error;
-      if (!ok && fnData?.error) throw new Error(typeof fnData.error === 'string' ? fnData.error : JSON.stringify(fnData.error));
+      if (fnData?.error) throw new Error(JSON.stringify(fnData.error));
 
       await supabase.from('announcements').update({ status: 'sent', updated_at: new Date() }).eq('id', savedId);
       alert("Campanha Enviada! 🚀");
@@ -531,7 +507,7 @@ export default function Announcements() {
       fetchCampaigns();
       resetEditor();
     } catch (err) {
-      console.error('[handleSave] Erro no envio:', err);
+      console.error(err);
       alert("Erro: " + (err?.message ?? String(err)));
     } finally {
       setLoading(false);
@@ -539,119 +515,299 @@ export default function Announcements() {
   };
 
   const handleEdit = (camp) => {
-    setEditorState({ id: camp.id, subject: camp.title || camp.subject, previewText: camp.preview_text || '', audienceType: camp.audience_type || 'all', tags: camp.tags ? (Array.isArray(camp.tags) ? camp.tags : camp.tags.split(',')) : [], blocks: Array.isArray(camp.content) ? camp.content : [] });
+    setEditorState({ 
+      id: camp.id, 
+      subject: camp.title || camp.subject, 
+      previewText: camp.preview_text || '', 
+      audienceType: camp.audience_type || 'all', 
+      tags: camp.tags ? (Array.isArray(camp.tags) ? camp.tags : camp.tags.split(',')) : [], 
+      blocks: Array.isArray(camp.content) ? camp.content : [] 
+    });
     setViewMode('editor');
   };
 
-  const resetEditor = () => { setEditorState({ id: null, subject: '', previewText: '', audienceType: 'all', tags: [], blocks: [] }); setSelectedBlockId(null); };
-  const toggleTag = (t) => { setEditorState(prev => ({ ...prev, tags: prev.tags.includes(t) ? prev.tags.filter(x => x !== t) : [...prev.tags, t] })); };
+  const resetEditor = () => { 
+    setEditorState({ id: null, subject: '', previewText: '', audienceType: 'all', tags: [], blocks: [] }); 
+    setSelectedBlockId(null); 
+  };
+
+  const toggleTag = (t) => { 
+    setEditorState(prev => ({ 
+      ...prev, 
+      tags: prev.tags.includes(t) ? prev.tags.filter(x => x !== t) : [...prev.tags, t] 
+    })); 
+  };
   
-  const addBlock = (type) => { const newBlock = { id: Date.now(), type, content: getDefaultContent(type), style: getDefaultStyle(type) }; setEditorState(prev => ({ ...prev, blocks: [...prev.blocks, newBlock] })); setSelectedBlockId(newBlock.id); };
-  const updateBlock = (id, key, val, isStyle = false) => { setEditorState(prev => ({ ...prev, blocks: prev.blocks.map(b => b.id !== id ? b : (isStyle ? { ...b, style: { ...b.style, [key]: val } } : { ...b, content: { ...b.content, [key]: val } })) })); };
-  const moveBlock = (id, dir) => { const idx = editorState.blocks.findIndex(b => b.id === id); if(idx===-1)return; const newBlocks=[...editorState.blocks]; const swap=dir==='up'?idx-1:idx+1; if(swap>=0&&swap<newBlocks.length){[newBlocks[idx],newBlocks[swap]]=[newBlocks[swap],newBlocks[idx]]; setEditorState(prev=>({...prev,blocks:newBlocks}));}};
-  const duplicateBlock = (id) => { const b=editorState.blocks.find(x=>x.id===id); setEditorState(prev=>({...prev,blocks:[...prev.blocks,{...b,id:Date.now()}]})); };
-  const removeBlock = (id) => { setEditorState(prev=>({...prev,blocks:prev.blocks.filter(b=>b.id!==id)})); setSelectedBlockId(null); };
+  // Funções de manipulação de blocos
+  const addBlock = (type) => { 
+    const newBlock = { id: Date.now(), type, content: getDefaultContent(type), style: getDefaultStyle(type) }; 
+    setEditorState(prev => ({ ...prev, blocks: [...prev.blocks, newBlock] })); 
+    setSelectedBlockId(newBlock.id); 
+  };
+  
+  const updateBlock = (id, key, val, isStyle = false) => { 
+    setEditorState(prev => ({ ...prev, blocks: prev.blocks.map(b => b.id !== id ? b : (isStyle ? { ...b, style: { ...b.style, [key]: val } } : { ...b, content: { ...b.content, [key]: val } })) })); 
+  };
+  
+  const moveBlock = (id, dir) => { 
+    const idx = editorState.blocks.findIndex(b => b.id === id); 
+    if(idx===-1)return; 
+    const newBlocks=[...editorState.blocks]; 
+    const swap=dir==='up'?idx-1:idx+1; 
+    if(swap>=0&&swap<newBlocks.length){
+      [newBlocks[idx],newBlocks[swap]]=[newBlocks[swap],newBlocks[idx]]; 
+      setEditorState(prev=>({...prev,blocks:newBlocks}));
+    }
+  };
+  
+  const duplicateBlock = (id) => { 
+    const b=editorState.blocks.find(x=>x.id===id); 
+    setEditorState(prev=>({...prev,blocks:[...prev.blocks,{...b,id:Date.now()}]})); 
+  };
+  
+  const removeBlock = (id) => { 
+    setEditorState(prev=>({...prev,blocks:prev.blocks.filter(b=>b.id!==id)})); 
+    setSelectedBlockId(null); 
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !selectedBlockId) return;
-    e.target.parentElement.innerHTML = "Subindo... ⏳";
+    const btnText = e.target.parentElement.innerHTML;
+    e.target.parentElement.innerHTML = "Enviando... ⏳";
+    
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from('campaign-images').upload(fileName, file);
       if (uploadError) throw uploadError;
+      
       const { data } = supabase.storage.from('campaign-images').getPublicUrl(fileName);
       const block = editorState.blocks.find(b => b.id === selectedBlockId);
       const key = block.type === 'header' ? 'imageUrl' : 'url';
       updateBlock(selectedBlockId, key, data.publicUrl);
-    } catch (error) { alert('Erro no upload.'); console.error(error); } 
-    finally { setTimeout(() => { /* Reset visual */ }, 500); }
+    } catch (error) { 
+      alert('Erro no upload.'); 
+      console.error(error); 
+    } finally {
+      e.target.parentElement.innerHTML = btnText;
+    }
   };
 
   if (viewMode === 'list') return <ListView campaigns={campaigns} onNew={() => { resetEditor(); setViewMode('editor'); }} onEdit={handleEdit} onViewDash={(c) => {setSelectedCampaign(c); setViewMode('dashboard')}} />;
   if (viewMode === 'dashboard') return <DashboardView campaign={selectedCampaign} onBack={() => setViewMode('list')} />;
 
   const currentBlock = editorState.blocks.find(b => b.id === selectedBlockId);
-  const npsPreviewContext = typeof window !== 'undefined' ? { baseUrl: window.location.origin, campaignId: editorState.id || 'preview', contactId: '11111111-1111-1111-1111-111111111111' } : null;
+  const npsPreviewContext = typeof window !== 'undefined' ? { baseUrl: window.location.origin, campaignId: editorState.id || 'preview', contactId: 'preview-contact-id' } : null;
   const htmlFinalPreview = generateHTML(editorState.blocks, editorState.subject, editorState.previewText, true, npsPreviewContext);
 
   return (
     <div className="audience-container" style={{ padding: 0, minHeight: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#09090a' }}>
+      {/* HEADER DO EDITOR */}
       <div style={{ height: 60, flexShrink: 0, borderBottom: '1px solid #29292e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', background: '#121214' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}><button onClick={() => setViewMode('list')} style={{ background: 'none', border: 'none', color: '#a8a8b3', cursor: 'pointer' }}><ArrowLeft size={20} /></button><div><span style={{ fontWeight: 'bold', color: 'white', fontSize: 14 }}>{editorState.id ? 'Editar Campanha' : 'Nova Campanha'}</span></div></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+          <button onClick={() => setViewMode('list')} style={{ background: 'none', border: 'none', color: '#a8a8b3', cursor: 'pointer' }}><ArrowLeft size={20} /></button>
+          <div><span style={{ fontWeight: 'bold', color: 'white', fontSize: 14 }}>{editorState.id ? 'Editar Campanha' : 'Nova Campanha'}</span></div>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ background: '#202024', borderRadius: 6, padding: 4, display: 'flex', border: '1px solid #29292e' }}>
             <button onClick={() => setPreviewDevice('desktop')} style={{ background: previewDevice === 'desktop' ? '#323238' : 'transparent', border: 'none', color: previewDevice === 'desktop' ? 'white' : '#7c7c8a', padding: 6, borderRadius: 4 }}><Monitor size={16} /></button>
             <button onClick={() => setPreviewDevice('mobile')} style={{ background: previewDevice === 'mobile' ? '#323238' : 'transparent', border: 'none', color: previewDevice === 'mobile' ? 'white' : '#7c7c8a', padding: 6, borderRadius: 4 }}><Smartphone size={16} /></button>
           </div>
-          
-          {/* CORREÇÃO 1: Botão Salvar Rascunho adicionado aqui */}
-          <button onClick={() => handleSave('draft')} disabled={loading} style={{ background: 'transparent', border: '1px solid #323238', color: '#e1e1e6', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: '600', marginRight: 5, display:'flex', alignItems:'center', gap:5 }}>
+          <button onClick={() => handleSave('draft')} disabled={loading} style={{ background: 'transparent', border: '1px solid #323238', color: '#e1e1e6', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: '600', display:'flex', alignItems:'center', gap:5 }}>
              {loading ? <Loader2 size={16} className="spin" /> : <><Save size={16}/> Salvar Rascunho</>}
           </button>
-
           <button onClick={handleSendTest} style={{ background: 'transparent', border: '1px solid #8257e6', color: '#8257e6', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', display:'flex', gap:6 }}><Mail size={16}/> Teste</button>
           <button onClick={() => setIsPreviewModalOpen(true)} className="btn-primary" style={{ padding: '8px 16px' }}><Eye size={16} style={{marginRight:6}}/> Revisar & Enviar</button>
         </div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        <div style={{ width: 320, flexShrink: 0, background: '#121214', borderRight: '1px solid #29292e', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div style={{ padding: 20, borderBottom: '1px solid #29292e' }}><p style={sectionTitleStyle}>CONFIGURAÇÕES</p><label style={labelStyle}>Assunto</label><input value={editorState.subject} onChange={e => setEditorState({...editorState, subject: e.target.value})} style={inputStyle} /><label style={{...labelStyle, marginTop: 15}}>Preheader</label><input value={editorState.previewText} onChange={e => setEditorState({...editorState, previewText: e.target.value})} style={inputStyle} /><div style={{ marginTop: 20 }}><label style={labelStyle}>Enviar Para:</label><div style={{ display: 'flex', gap: 10 }}><TabButton active={editorState.audienceType === 'all'} onClick={() => setEditorState({...editorState, audienceType: 'all'})} label="Todos" icon={<Users size={14}/>} /><TabButton active={editorState.audienceType === 'tags'} onClick={() => setEditorState({...editorState, audienceType: 'tags'})} label="Por Tags" icon={<Tag size={14}/>} /></div>{editorState.audienceType === 'tags' && (<div style={{ background: '#202024', padding: 10, borderRadius: 6, border: '1px solid #29292e', marginTop:10 }}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{availableTags.map(t => (<div key={t.id} onClick={() => toggleTag(t.name)} style={{ fontSize: 11, cursor: 'pointer', padding: '4px 8px', borderRadius: 4, background: editorState.tags.includes(t.name) ? (t.color || '#8257e6') : '#29292e', color: 'white', border: `1px solid ${t.color || '#323238'}` }}>{t.name}</div>))}</div></div>)}</div></div>
-            <div style={{ padding: 20 }}><p style={sectionTitleStyle}>ADICIONAR BLOCOS</p><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}><BlockCard icon={<Layout size={18} />} label="Topo" onClick={() => addBlock('header')} /><BlockCard icon={<Type size={18} />} label="Texto" onClick={() => addBlock('text')} /><BlockCard icon={<Columns size={18} />} label="Img + Texto" onClick={() => addBlock('imagetext')} /><BlockCard icon={<ImageIcon size={18} />} label="Imagem" onClick={() => addBlock('image')} /><BlockCard icon={<MousePointerClick size={18} />} label="Botão" onClick={() => addBlock('button')} /><BlockCard icon={<Share2 size={18} />} label="Social" onClick={() => addBlock('social')} /><BlockCard icon={<Minus size={18} />} label="Espaço" onClick={() => addBlock('spacer')} /><BlockCard icon={<Smile size={18} />} label="Pesquisa/NPS" onClick={() => addBlock('nps')} /></div></div>
+
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+        
+        {/* SIDEBAR ESQUERDA: BLOCOS E CONFIGS */}
+        <div style={{ width: 320, flexShrink: 0, background: '#121214', borderRight: '1px solid #29292e', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          <div style={{ padding: 20, borderBottom: '1px solid #29292e' }}>
+            <p style={styles.sectionTitle}>CONFIGURAÇÕES</p>
+            <label style={styles.label}>Assunto</label>
+            <input value={editorState.subject} onChange={e => setEditorState({...editorState, subject: e.target.value})} style={styles.input} />
+            <label style={{...styles.label, marginTop: 15}}>Preheader</label>
+            <input value={editorState.previewText} onChange={e => setEditorState({...editorState, previewText: e.target.value})} style={styles.input} />
+            
+            <div style={{ marginTop: 20 }}>
+              <label style={styles.label}>Enviar Para:</label>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <TabButton active={editorState.audienceType === 'all'} onClick={() => setEditorState({...editorState, audienceType: 'all'})} label="Todos" icon={<Users size={14}/>} />
+                <TabButton active={editorState.audienceType === 'tags'} onClick={() => setEditorState({...editorState, audienceType: 'tags'})} label="Por Tags" icon={<Tag size={14}/>} />
+              </div>
+              {editorState.audienceType === 'tags' && (
+                <div style={{ background: '#202024', padding: 10, borderRadius: 6, border: '1px solid #29292e', marginTop:10 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {availableTags.map(t => (
+                      <div key={t.id} onClick={() => toggleTag(t.name)} style={{ fontSize: 11, cursor: 'pointer', padding: '4px 8px', borderRadius: 4, background: editorState.tags.includes(t.name) ? (t.color || '#8257e6') : '#29292e', color: 'white', border: `1px solid ${t.color || '#323238'}` }}>{t.name}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ padding: 20 }}>
+            <p style={styles.sectionTitle}>ADICIONAR BLOCOS</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {BLOCK_TYPES.map(b => (
+                <BlockCard key={b.type} icon={b.icon} label={b.label} onClick={() => addBlock(b.type)} />
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* ÁREA CENTRAL: PREVIEW (CORRIGIDA) */}
         <div style={{ flex: 1, minHeight: 0, background: '#09090a', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', overflowY: 'auto', overflowX: 'hidden' }}>
-          <div style={{ width: previewDevice === 'mobile' ? 375 : 600, minWidth: previewDevice === 'mobile' ? 375 : 600, transition: 'width 0.3s', background: 'white', minHeight: '100%', height: 'auto', overflow: 'visible', borderRadius: previewDevice === 'mobile' ? 30 : 4, paddingBottom: 40 }}>
-             <div style={{ padding: 0, overflow: 'visible' }}>{editorState.blocks.map((block) => (<div key={block.id} onClick={() => setSelectedBlockId(block.id)} style={{ position: 'relative', outline: selectedBlockId === block.id ? '2px solid #8257e6' : '1px dashed transparent', cursor: 'pointer' }}><div dangerouslySetInnerHTML={{ __html: generateHTML([block], '', '', false, npsPreviewContext) }} />{selectedBlockId === block.id && (<div className="block-actions" style={{ position: 'absolute', right: -40, top: 0, display: 'flex', flexDirection: 'column', gap: 5 }}><ActionBtn icon={<ChevronDown size={14} style={{transform:'rotate(180deg)'}}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'up')}} /><ActionBtn icon={<ChevronDown size={14}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'down')}} /><ActionBtn icon={<Copy size={14}/>} onClick={(e) => {e.stopPropagation(); duplicateBlock(block.id)}} /><ActionBtn icon={<Trash2 size={14}/>} color="#f75a68" onClick={(e) => {e.stopPropagation(); removeBlock(block.id)}} /></div>)}</div>))}</div>
+          {/* Container do papel branco com flexShrink: 0 e fit-content */}
+          <div style={{ 
+            width: previewDevice === 'mobile' ? 375 : 600, 
+            minWidth: previewDevice === 'mobile' ? 375 : 600, 
+            transition: 'width 0.3s', 
+            background: 'white', 
+            minHeight: '800px', // Altura mínima de uma página A4 aprox
+            height: 'fit-content', // Permite crescer infinitamente
+            flexShrink: 0, // Impede que o flexbox do pai esmague este container
+            borderRadius: previewDevice === 'mobile' ? 30 : 4, 
+            paddingBottom: 40,
+            marginBottom: 40, // Espaço extra no final do scroll
+            boxShadow: '0 0 20px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}>
+             <div style={{ padding: 0 }}>
+               {editorState.blocks.map((block) => (
+                 <div key={block.id} onClick={() => setSelectedBlockId(block.id)} style={{ position: 'relative', outline: selectedBlockId === block.id ? '2px solid #8257e6' : '1px dashed transparent', cursor: 'pointer' }}>
+                   <div dangerouslySetInnerHTML={{ __html: generateHTML([block], '', '', false, npsPreviewContext) }} />
+                   {selectedBlockId === block.id && (
+                     <div className="block-actions" style={{ position: 'absolute', right: -40, top: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                       <ActionBtn icon={<ChevronDown size={14} style={{transform:'rotate(180deg)'}}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'up')}} />
+                       <ActionBtn icon={<ChevronDown size={14}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'down')}} />
+                       <ActionBtn icon={<Copy size={14}/>} onClick={(e) => {e.stopPropagation(); duplicateBlock(block.id)}} />
+                       <ActionBtn icon={<Trash2 size={14}/>} color="#f75a68" onClick={(e) => {e.stopPropagation(); removeBlock(block.id)}} />
+                     </div>
+                   )}
+                 </div>
+               ))}
+               {editorState.blocks.length === 0 && <div style={{padding:50, textAlign:'center', color:'#ccc'}}>Arraste ou clique em blocos para começar</div>}
+             </div>
           </div>
         </div>
-        <div style={{ width: 300, flexShrink: 0, background: '#121214', borderLeft: '1px solid #29292e', display: 'flex', flexDirection: 'column' }}>
-           <div style={{ padding: 15, borderBottom: '1px solid #29292e', background: '#202024' }}><span style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>{currentBlock ? `EDITAR: ${currentBlock.type.toUpperCase()}` : 'PROPRIEDADES'}</span></div>
-           <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+
+        {/* SIDEBAR DIREITA: PROPRIEDADES */}
+        <div style={{ width: 300, flexShrink: 0, background: '#121214', borderLeft: '1px solid #29292e', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+           <div style={{ padding: 15, borderBottom: '1px solid #29292e', background: '#202024' }}>
+             <span style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>{currentBlock ? `EDITAR: ${currentBlock.type.toUpperCase()}` : 'PROPRIEDADES'}</span>
+           </div>
+           <div style={{ padding: 20 }}>
              {selectedBlockId && currentBlock ? (
                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                 {currentBlock.type === 'text' && <><RichTextEditor value={currentBlock.content.text} onChange={val => updateBlock(currentBlock.id, 'text', val)} /><AlignSelector value={currentBlock.style.align} onChange={val => updateBlock(currentBlock.id, 'align', val, true)} /><label style={labelStyle}>Cor do texto</label><ColorPicker value={currentBlock.style.color} onChange={val => updateBlock(currentBlock.id, 'color', val, true)} /><label style={labelStyle}>Fonte</label><select value={currentBlock.style.fontFamily || 'sans-serif'} onChange={e => updateBlock(currentBlock.id, 'fontFamily', e.target.value, true)} style={inputStyle}><option value="sans-serif">Sans-serif</option><option value="Georgia, serif">Georgia</option><option value="'Times New Roman', serif">Times New Roman</option><option value="Arial, sans-serif">Arial</option><option value="monospace">Monospace</option></select><label style={labelStyle}>Cor de fundo</label><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></>}
                  
-                 {currentBlock.type === 'image' && <><label style={uploadBtnStyle}><input type="file" hidden onChange={handleImageUpload} /> <ImageIcon size={16}/> Carregar</label><input value={currentBlock.style.width || '100%'} onChange={e => updateBlock(currentBlock.id, 'width', e.target.value, true)} style={inputStyle} /><label style={labelStyle}>Link da Imagem (Opcional)</label><input value={currentBlock.content.link || ''} onChange={e => updateBlock(currentBlock.id, 'link', e.target.value)} placeholder="https://..." style={inputStyle} /><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></>}
+                 {currentBlock.type === 'text' && (
+                   <>
+                     <RichTextEditor value={currentBlock.content.text} onChange={val => updateBlock(currentBlock.id, 'text', val)} />
+                     <AlignSelector value={currentBlock.style.align} onChange={val => updateBlock(currentBlock.id, 'align', val, true)} />
+                     <label style={styles.label}>Cor do texto</label>
+                     <ColorPicker value={currentBlock.style.color} onChange={val => updateBlock(currentBlock.id, 'color', val, true)} />
+                     <label style={styles.label}>Fonte</label>
+                     <select value={currentBlock.style.fontFamily || 'sans-serif'} onChange={e => updateBlock(currentBlock.id, 'fontFamily', e.target.value, true)} style={styles.input}>
+                       <option value="sans-serif">Sans-serif</option>
+                       <option value="Georgia, serif">Georgia</option>
+                       <option value="'Times New Roman', serif">Times New Roman</option>
+                       <option value="Arial, sans-serif">Arial</option>
+                       <option value="monospace">Monospace</option>
+                     </select>
+                     <label style={styles.label}>Cor de fundo</label>
+                     <ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} />
+                   </>
+                 )}
                  
-                 {/* (Outros editores mantidos resumidos para caber visualmente) */}
-                 {currentBlock.type === 'imagetext' && <><label style={uploadBtnStyle}><input type="file" hidden onChange={handleImageUpload} /> Imagem</label><input value={currentBlock.content.title} onChange={e => updateBlock(currentBlock.id, 'title', e.target.value)} style={inputStyle} /><textarea rows={4} value={currentBlock.content.text} onChange={e => updateBlock(currentBlock.id, 'text', e.target.value)} style={inputStyle} /></>}
-                 {currentBlock.type === 'button' && <><input value={currentBlock.content.text} onChange={e => updateBlock(currentBlock.id, 'text', e.target.value)} style={inputStyle} /><input value={currentBlock.content.url} onChange={e => updateBlock(currentBlock.id, 'url', e.target.value)} style={inputStyle} /><ColorPicker value={currentBlock.style.buttonColor} onChange={val => updateBlock(currentBlock.id, 'buttonColor', val, true)} /></>}
-                 {currentBlock.type === 'spacer' && <><label style={labelStyle}>Altura do espaço</label><input type="range" min="10" max="100" value={currentBlock.style.height} onChange={e => updateBlock(currentBlock.id, 'height', e.target.value, true)} /><label style={{display:'flex',gap:10,fontSize:12,color:'#aaa',marginTop:5}}>Linha divisória<input type="checkbox" checked={currentBlock.style.showLine} onChange={e => updateBlock(currentBlock.id, 'showLine', e.target.checked, true)} /></label>{currentBlock.style.showLine && <><label style={labelStyle}>Cor da linha</label><ColorPicker value={currentBlock.style.lineColor} onChange={val => updateBlock(currentBlock.id, 'lineColor', val, true)} /></>}<label style={labelStyle}>Cor do espaço (fundo)</label><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></>}
-                 
-                 {/* CORREÇÃO 2: Links Sociais */}
-                 {currentBlock.type === 'social' && <><label style={labelStyle}>Deixe vazio para ocultar</label><input placeholder="Instagram URL" value={currentBlock.content.instagram} onChange={e => updateBlock(currentBlock.id, 'instagram', e.target.value)} style={inputStyle}/><input placeholder="LinkedIn URL" value={currentBlock.content.linkedin} onChange={e => updateBlock(currentBlock.id, 'linkedin', e.target.value)} style={inputStyle}/><input placeholder="Site URL" value={currentBlock.content.website} onChange={e => updateBlock(currentBlock.id, 'website', e.target.value)} style={inputStyle}/><ColorPicker value={currentBlock.style.color} onChange={val => updateBlock(currentBlock.id, 'color', val, true)}/></>}
+                 {currentBlock.type === 'image' && (
+                   <>
+                     <label style={{...styles.input, textAlign: 'center', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#29292e'}}>
+                       <input type="file" hidden onChange={handleImageUpload} /> <ImageIcon size={16}/> Carregar
+                     </label>
+                     <label style={styles.label}>Largura</label>
+                     <input value={currentBlock.style.width || '100%'} onChange={e => updateBlock(currentBlock.id, 'width', e.target.value, true)} style={styles.input} />
+                     <label style={styles.label}>Link da Imagem (Opcional)</label>
+                     <input value={currentBlock.content.link || ''} onChange={e => updateBlock(currentBlock.id, 'link', e.target.value)} placeholder="https://..." style={styles.input} />
+                     <label style={styles.label}>Fundo</label>
+                     <ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} />
+                   </>
+                 )}
 
-                 {/* CORREÇÃO 2: Header com Link */}
+                 {currentBlock.type === 'button' && (
+                   <>
+                     <label style={styles.label}>Texto</label>
+                     <input value={currentBlock.content.text} onChange={e => updateBlock(currentBlock.id, 'text', e.target.value)} style={styles.input} />
+                     <label style={styles.label}>Link URL</label>
+                     <input value={currentBlock.content.url} onChange={e => updateBlock(currentBlock.id, 'url', e.target.value)} style={styles.input} />
+                     <label style={styles.label}>Cor do Botão</label>
+                     <ColorPicker value={currentBlock.style.buttonColor} onChange={val => updateBlock(currentBlock.id, 'buttonColor', val, true)} />
+                     <AlignSelector value={currentBlock.style.align} onChange={val => updateBlock(currentBlock.id, 'align', val, true)} />
+                   </>
+                 )}
+
                  {currentBlock.type === 'header' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-                       <label style={uploadBtnStyle}><input type="file" hidden onChange={handleImageUpload} /> <ImageIcon size={16}/> Carregar Logo</label>
-                       <div><label style={labelStyle}>Link do Logo (Opcional)</label><input value={currentBlock.content.url || ''} onChange={e => updateBlock(currentBlock.id, 'url', e.target.value)} placeholder="https://..." style={inputStyle} /></div>
-                       <div><label style={labelStyle}>Cor de Fundo</label><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></div>
-                       <div><label style={labelStyle}>Alinhamento</label><AlignSelector value={currentBlock.style.align} onChange={val => updateBlock(currentBlock.id, 'align', val, true)} /></div>
+                       <label style={{...styles.input, textAlign: 'center', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#29292e'}}>
+                         <input type="file" hidden onChange={handleImageUpload} /> <ImageIcon size={16}/> Carregar Logo
+                       </label>
+                       <div>
+                         <label style={styles.label}>Link do Logo (Opcional)</label>
+                         <input value={currentBlock.content.url || ''} onChange={e => updateBlock(currentBlock.id, 'url', e.target.value)} placeholder="https://..." style={styles.input} />
+                       </div>
+                       <div><label style={styles.label}>Cor de Fundo</label><ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} /></div>
+                       <div><label style={styles.label}>Alinhamento</label><AlignSelector value={currentBlock.style.align} onChange={val => updateBlock(currentBlock.id, 'align', val, true)} /></div>
                     </div>
+                 )}
+
+                 {currentBlock.type === 'social' && (
+                   <>
+                     <label style={styles.label}>Links (Vazio = Oculto)</label>
+                     <input placeholder="Instagram" value={currentBlock.content.instagram} onChange={e => updateBlock(currentBlock.id, 'instagram', e.target.value)} style={styles.input} />
+                     <input placeholder="LinkedIn" value={currentBlock.content.linkedin} onChange={e => updateBlock(currentBlock.id, 'linkedin', e.target.value)} style={{...styles.input, marginTop:10}} />
+                     <input placeholder="Website" value={currentBlock.content.website} onChange={e => updateBlock(currentBlock.id, 'website', e.target.value)} style={{...styles.input, marginTop:10}} />
+                     <label style={{...styles.label, marginTop:15}}>Cor dos links</label>
+                     <ColorPicker value={currentBlock.style.color} onChange={val => updateBlock(currentBlock.id, 'color', val, true)} />
+                   </>
                  )}
 
                  {currentBlock.type === 'nps' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-                       <label style={labelStyle}>Pergunta</label>
-                       <input value={currentBlock.content.prompt || ''} onChange={e => updateBlock(currentBlock.id, 'prompt', e.target.value)} placeholder="De 0 a 10, o quanto..." style={inputStyle} />
+                       <label style={styles.label}>Pergunta</label>
+                       <input value={currentBlock.content.prompt || ''} onChange={e => updateBlock(currentBlock.id, 'prompt', e.target.value)} placeholder="De 0 a 10, o quanto..." style={styles.input} />
                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#a8a8b3' }}>
                          <input type="checkbox" checked={!!currentBlock.content.useEmojis} onChange={e => updateBlock(currentBlock.id, 'useEmojis', e.target.checked)} />
                          Usar emojis (0–10) em vez de números
                        </label>
-                       <label style={labelStyle}>Cor de fundo</label>
+                       <label style={styles.label}>Cor de fundo</label>
                        <ColorPicker value={currentBlock.style.backgroundColor} onChange={val => updateBlock(currentBlock.id, 'backgroundColor', val, true)} />
                     </div>
                  )}
+
                </div>
              ) : <p style={{textAlign:'center', color:'#555', marginTop:50}}>Selecione um bloco</p>}
            </div>
         </div>
       </div>
-      {isPreviewModalOpen && (<div className="modal-overlay"><div className="modal-content" style={{maxWidth: 900, height: '90vh', padding: 0, display: 'flex', flexDirection: 'column'}}><div className="modal-header"><h2>Revisão Final</h2><button onClick={() => setIsPreviewModalOpen(false)} className="close-btn"><X size={20}/></button></div><div style={{flex: 1, background: '#e1e1e6', padding: 40, overflowY: 'auto', display:'flex', justifyContent:'center'}}><div style={{width: 600, background: 'white', boxShadow: '0 10px 30px rgba(0,0,0,0.1)'}} dangerouslySetInnerHTML={{__html: htmlFinalPreview}} /></div><div className="modal-footer"><button onClick={() => setIsPreviewModalOpen(false)} style={{marginRight: 10, background:'transparent', border:'none', cursor:'pointer'}}>Voltar</button><button onClick={() => handleSave('sent')} className="btn-save"><Send size={18}/> Confirmar Envio</button></div></div></div>)}
+
+      {isPreviewModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{maxWidth: 900, height: '90vh', padding: 0, display: 'flex', flexDirection: 'column'}}>
+            <div className="modal-header"><h2>Revisão Final</h2><button onClick={() => setIsPreviewModalOpen(false)} className="close-btn"><X size={20}/></button></div>
+            <div style={{flex: 1, background: '#e1e1e6', padding: 40, overflowY: 'auto', display:'flex', justifyContent:'center'}}>
+              <div style={{width: 600, background: 'white', boxShadow: '0 10px 30px rgba(0,0,0,0.1)'}} dangerouslySetInnerHTML={{__html: htmlFinalPreview}} />
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setIsPreviewModalOpen(false)} style={{marginRight: 10, background:'transparent', border:'none', cursor:'pointer'}}>Voltar</button>
+              <button onClick={() => handleSave('sent')} className="btn-save"><Send size={18}/> Confirmar Envio</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
