@@ -209,17 +209,17 @@ const ListView = ({ campaigns, onNew, onEdit, onViewDash }) => {
   const avgOpenRate = totalSent > 0 ? ((totalOpens / totalSent) * 100).toFixed(1) : 0;
 
   return (
-    <div className="audience-container" style={{ height: '100%', overflowY: 'auto', padding: '30px' }}>
-      <div className="audience-header">
+    <div className="audience-container" style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '30px', display: 'flex', flexDirection: 'column' }}>
+      <div className="audience-header" style={{ flexShrink: 0 }}>
         <div className="audience-title"><h1>Disparos</h1><p style={{ color: '#a8a8b3' }}>Visão geral de comunicados.</p></div>
         <button className="btn-primary" onClick={onNew}><Plus size={20} /> Nova Campanha</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 15, marginBottom: 30 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 15, marginBottom: 30, flexShrink: 0 }}>
         <KPICard title="Total Enviados" value={totalSent} subtitle="E-mails Disparados" color="#8257e6" icon={<Activity size={20}/>} />
         <KPICard title="Taxa Média" value={`${avgOpenRate}%`} subtitle="Abertura Geral" color="#00B37E" icon={<Eye size={20}/>} />
         <KPICard title="Campanhas" value={campaigns.length} subtitle="Criadas" color="#e1e1e6" icon={<Layout size={20}/>} />
       </div>
-      <div className="table-container">
+      <div className="table-container" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <table>
             <thead><tr><th>Status</th><th>Assunto</th><th>Data</th><th>Ações</th></tr></thead>
             <tbody>
@@ -405,24 +405,61 @@ export default function Announcements() {
   const handleSave = async (status = 'draft') => {
     if (!editorState.subject) return alert("Ei! Dê um assunto para sua campanha.");
     setLoading(true);
-    const payload = { title: editorState.subject, content: editorState.blocks, status, updated_at: new Date() };
+    const isSending = status === 'sent';
+    const payload = {
+      title: editorState.subject,
+      content: editorState.blocks,
+      status: isSending ? 'draft' : status,
+      updated_at: new Date(),
+      ...(editorState.previewText && { preview_text: editorState.previewText }),
+      ...(editorState.audienceType && { audience_type: editorState.audienceType }),
+      ...(editorState.tags?.length > 0 && { tags: editorState.tags })
+    };
     try {
       let savedId = editorState.id;
       if (editorState.id) {
         await supabase.from('announcements').update(payload).eq('id', editorState.id);
       } else {
-        const { data } = await supabase.from('announcements').insert([payload]).select();
+        const { data, error } = await supabase.from('announcements').insert([payload]).select();
+        if (error) throw error;
         savedId = data[0].id;
       }
-      if (status === 'draft') { alert("Rascunho salvo!"); fetchCampaigns(); setLoading(false); return; }
-      
+      if (status === 'draft') {
+        alert("Rascunho salvo!");
+        fetchCampaigns();
+        setLoading(false);
+        return;
+      }
+
       const htmlBody = generateHTML(editorState.blocks, editorState.subject, editorState.previewText, true);
-      const { error } = await supabase.functions.invoke('send-email', {
-        body: { type: 'campaign', campaignId: savedId, subject: editorState.subject, html: htmlBody, audienceType: editorState.audienceType, tags: editorState.tags }
-      });
+      const invokePayload = {
+        type: 'campaign',
+        campaignId: savedId,
+        subject: editorState.subject,
+        html: htmlBody,
+        audienceType: editorState.audienceType ?? 'all',
+        tags: editorState.tags ?? []
+      };
+      console.log('[handleSave] Enviando para send-email. Payload:', { ...invokePayload, html: '(html omitido)' });
+      const { data: fnData, error } = await supabase.functions.invoke('send-email', { body: invokePayload });
+      console.log('[handleSave] Resposta send-email:', { data: fnData, error: error?.message ?? null });
+
       if (error) throw error;
-      alert("Campanha Enviada! 🚀"); setIsPreviewModalOpen(false); setViewMode('list'); fetchCampaigns(); resetEditor();
-    } catch (err) { alert("Erro: " + err.message); } finally { setLoading(false); }
+      const ok = fnData && !fnData.error;
+      if (!ok && fnData?.error) throw new Error(typeof fnData.error === 'string' ? fnData.error : JSON.stringify(fnData.error));
+
+      await supabase.from('announcements').update({ status: 'sent', updated_at: new Date() }).eq('id', savedId);
+      alert("Campanha Enviada! 🚀");
+      setIsPreviewModalOpen(false);
+      setViewMode('list');
+      fetchCampaigns();
+      resetEditor();
+    } catch (err) {
+      console.error('[handleSave] Erro no envio:', err);
+      alert("Erro: " + (err?.message ?? String(err)));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEdit = (camp) => {
@@ -489,7 +526,7 @@ export default function Announcements() {
           </div>
         </div>
         <div style={{ flex: 1, background: '#09090a', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', overflowY: 'auto' }}>
-          <div style={{ width: previewDevice === 'mobile' ? '375px' : '600px', transition: 'width 0.3s', background: 'white', minHeight: 800, borderRadius: previewDevice === 'mobile' ? 30 : 4 }}>
+          <div style={{ width: previewDevice === 'mobile' ? '375px' : '600px', transition: 'width 0.3s', background: 'white', minHeight: 'fit-content', height: 'fit-content', borderRadius: previewDevice === 'mobile' ? 30 : 4 }}>
              <div style={{ padding: 0 }}>{editorState.blocks.map((block) => (<div key={block.id} onClick={() => setSelectedBlockId(block.id)} style={{ position: 'relative', outline: selectedBlockId === block.id ? '2px solid #8257e6' : '1px dashed transparent', cursor: 'pointer' }}><div dangerouslySetInnerHTML={{ __html: generateHTML([block], '', '', false) }} />{selectedBlockId === block.id && (<div className="block-actions" style={{ position: 'absolute', right: -40, top: 0, display: 'flex', flexDirection: 'column', gap: 5 }}><ActionBtn icon={<ChevronDown size={14} style={{transform:'rotate(180deg)'}}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'up')}} /><ActionBtn icon={<ChevronDown size={14}/>} onClick={(e) => {e.stopPropagation(); moveBlock(block.id, 'down')}} /><ActionBtn icon={<Copy size={14}/>} onClick={(e) => {e.stopPropagation(); duplicateBlock(block.id)}} /><ActionBtn icon={<Trash2 size={14}/>} color="#f75a68" onClick={(e) => {e.stopPropagation(); removeBlock(block.id)}} /></div>)}</div>))}</div>
           </div>
         </div>

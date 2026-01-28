@@ -10,15 +10,15 @@ export default function Sidebar({ channels = [], onCreateChannel }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, logout } = useAuth();
 
   // Função para verificar se o item está ativo
   const isActive = (path) => location.pathname.startsWith(path);
 
   // Função de Logout
   async function handleLogout() {
-    await signOut();
-    navigate('/login');
+    await logout();
+    window.location.href = '/login';
   }
 
   return (
