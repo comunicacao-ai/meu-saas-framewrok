@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Layout, MessageSquare, Users, Tag, LogOut, 
-  ChevronLeft, ChevronRight, Hash, Plus, Settings
+  ChevronLeft, ChevronRight, Hash, Plus, Settings,
+  BarChart2 // <--- IMPORTADO O ÍCONE DE GRÁFICO
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabaseClient';
@@ -39,7 +40,7 @@ export default function Sidebar({ channels = [], onCreateChannel }) {
         borderRight: '1px solid #323238', 
         display: 'flex', 
         flexDirection: 'column', 
-        transition: 'width 0.3s ease', // Animação suave
+        transition: 'width 0.3s ease', 
         position: 'relative',
         flexShrink: 0 
       }}
@@ -86,6 +87,16 @@ export default function Sidebar({ channels = [], onCreateChannel }) {
         
         {/* Seção Principal */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          
+          {/* NOVO ITEM DASHBOARD 👇 */}
+          <NavItem 
+            icon={<BarChart2 size={20} />} 
+            label="Dashboard" 
+            collapsed={isCollapsed} 
+            active={isActive('/dashboard')}
+            onClick={() => navigate('/dashboard')}
+          />
+
           <NavItem 
             icon={<Layout size={20} />} 
             label="Comunicados" 
